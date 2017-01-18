@@ -61,4 +61,5 @@ type metaClient interface {
 
 ## How data stored in dish in hinted handoff system
 For any incoming write request, if coordinator detect some request failed to write to some node(this is realted with consistency level), corrdinator node will forward 
-such request into hinted handoff service. When hinted handoff receieved that request, it will write `shardID`, `ownerID` and all `Points` into disk file(known as segment). 
+such request into hinted handoff service. When hinted handoff receieved that request, it will write `shardID` and all `Points` into disk file(known as segment). 
+`ownerID` is the name of the directory in `hh`.
