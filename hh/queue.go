@@ -89,7 +89,7 @@ type segments []*segment
 // make segments can be sorted
 func (s segments) Len() int           { return len(s) }
 func (s segments) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s segments) Less(i, j int) bool { return s[i].segmentID < s[j].segmentID }
+func (s segments) Less(i, j int) bool { return s[i].size > s[j].size } // segments sorted in a decreasing order
 
 // newQueue create a queue that will store segments in dir and that will
 // consume more than maxSize on disk.
@@ -500,8 +500,6 @@ type segment struct {
 	pos         int64
 	currentSize int64
 	maxSize     int64
-
-	segmentID uint64
 }
 
 var mutex sync.RWMutex
