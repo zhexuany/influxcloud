@@ -29,6 +29,10 @@ purge-interval = "1h"
 		t.Fatalf("unexpected enabled: got %v, exp %v", c.Enabled, exp)
 	}
 
+	if exp := 20; c.RetryConcurrency != int64(exp) {
+		t.Fatalf("unexpected retry concurrency: got %v, exp %v", c.RetryConcurrency, exp)
+	}
+
 	if exp := 10 * time.Minute; c.RetryInterval.String() != exp.String() {
 		t.Fatalf("unexpected retry interval: got %v, exp %v", c.RetryInterval, exp)
 	}
