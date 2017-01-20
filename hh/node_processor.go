@@ -351,16 +351,6 @@ func (n *NodeProcessor) SendWrite() (int, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	var totalBytes int64
-	var totalSegments int64
-	defer func() {
-		atomic.StoreInt64(&totalSegments, n.queue.totalSegments())
-		atomic.StoreInt64(&totalBytes, n.queue.TotalBytes())
-		if totalBytes == 0 {
-			return
-		}
-	}()
-
 	active, err := n.Active()
 	if err != nil {
 		return 0, err
@@ -369,8 +359,7 @@ func (n *NodeProcessor) SendWrite() (int, error) {
 		return 0, io.EOF
 	}
 
-	// concurrently write
-	buf, err := n.queue.PeekN(n.cfg.RetryConcurrency)
+	buf, err := n.queue.Current()
 	if err != nil {
 		return 0, err
 	}

@@ -63,3 +63,25 @@ type metaClient interface {
 For any incoming write request, if coordinator detect some request failed to write to some node(this is realted with consistency level), corrdinator node will forward 
 such request into hinted handoff service. When hinted handoff receieved that request, it will write `shardID` and all `Points` into disk file(known as segment). 
 `ownerID` is the name of the directory in `hh`.
+
+## Elements in hinted handoff system
+ 
+### Segment
+
+### Queue
+
+### Node Processor
+
+Each node processor is recognized by `nodeID`. In addition, `nodeID` can be used for sedning pending write into these offline node storage. Inside node processor, there are two interface:
+1. `metaClient`
+2. `shardWriter`
+
+`metaClient` has only one method `DataNode(id uint64)`. This can is the way to determine current node is online or offline. If such node is online, then this method will return normally. If not, then such node is offline. 
+
+`shardWriter` has only one method:
+
+~~~
+	WriteShard(shardID, ownerID uint64, points []models.Point) error
+~~~
+
+This method is used when node processor trying to empty pending write.

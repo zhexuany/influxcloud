@@ -837,6 +837,7 @@ func (l *segment) current() ([]byte, error) {
 	return b, nil
 }
 
+// TODO zhexuany finished this when alpha is ready
 // peek returns the next n blocks in segement without advancing the pos.
 func (l *segment) peek(n int64) ([]byte, error) {
 	l.mu.Lock()
@@ -865,7 +866,7 @@ func (l *segment) peek(n int64) ([]byte, error) {
 			return buf, err
 		}
 		l.currentSize = int64(currentSize)
-		//
+		// check currentSize
 		if l.currentSize > 0 {
 			// need check currentSize against maxSize.
 			// In some case, file is malformed and
