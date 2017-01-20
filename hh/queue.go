@@ -89,7 +89,7 @@ type segments []*segment
 // make segments can be sorted
 func (s segments) Len() int           { return len(s) }
 func (s segments) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s segments) Less(i, j int) bool { return s[i].size > s[j].size } // segments sorted in a decreasing order
+func (s segments) Less(i, j int) bool { return s[i].segmentID > s[j].segmentID } // segments sorted according to its segmentID
 
 // newQueue create a queue that will store segments in dir and that will
 // consume more than maxSize on disk.
@@ -423,6 +423,7 @@ func (l *queue) Current() ([]byte, error) {
 func (l *queue) PeekN(n int64) ([]byte, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+
 	if l.head == nil {
 		return nil, ErrNotOpen
 	}
@@ -449,8 +450,8 @@ func (l *queue) Advance() error {
 }
 
 func (l *queue) trimHead() error {
-	//
-	//
+	// if head is the only segment and is already full in the queue
+	// before triming current head, a new head need be created
 	if len(l.segments) == 1 && l.head.full() {
 		if err := l.addSegment(); err != nil {
 			return err
@@ -484,7 +485,7 @@ func (l *queue) trimHead() error {
 // └────────────┘└────────────┘ └────────────┘└────────────┘ └────────────┘
 //
 // The footer holds the pointer to the head entry at the end of the segment to allow writes
-// to seek to the end and write sequentially (vs having to seek back to the beginning of
+// to eek to the end and write sequentially (vs having to seek back to the beginning of
 // the segment to update the head pointer).  Reads must seek to the end then back into the
 // segment offset stored in the footer.
 //
@@ -500,6 +501,8 @@ type segment struct {
 	pos         int64
 	currentSize int64
 	maxSize     int64
+
+	segmentID uint64
 }
 
 var mutex sync.RWMutex
@@ -510,7 +513,7 @@ func newSegment(path string, maxSize int64) (*segment, error) {
 		return nil, err
 	}
 
-	_, err = strconv.ParseUint(filepath.Base(path), 10, 64)
+	id, err := strconv.ParseUint(filepath.Base(path), 10, 64)
 	if err != nil {
 		return nil, err
 	}
@@ -532,7 +535,7 @@ func newSegment(path string, maxSize int64) (*segment, error) {
 		// with maxSize
 		size = maxSize
 	}
-	s := &segment{file: f, path: path, size: size, maxSize: maxSize}
+	s := &segment{file: f, path: path, size: size, maxSize: maxSize, segmentID: id}
 
 	// after segment creation, open it with mutex protection
 	mutex.Lock()
@@ -761,6 +764,14 @@ func (l *segment) append(b []byte) error {
 		return err
 	}
 
+	// First write will write the length of block
+	// as 8 bytes into file. This can be used for
+	// retrieving data from file.
+	// Second write will write actual data into
+	// file.
+	// Third write will update footer. This is the
+	// last eight bytes which record current read
+	// position.
 	if err := l.writeUint64(uint64(len(b))); err != nil {
 		return err
 	}
@@ -784,13 +795,14 @@ func (l *segment) append(b []byte) error {
 	l.size += int64(len(b)) + 8 // uint64 for slice length
 
 	return nil
+
 }
 
 // empty will return true if file has no content
 func (l *segment) empty() bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return l.currentSize == 0
+	return l.size == 0
 }
 
 // current returns byte slice that the current segment points
@@ -825,39 +837,52 @@ func (l *segment) current() ([]byte, error) {
 	return b, nil
 }
 
-// peek returns the next n bytes without advancing the pos.
+// peek returns the next n blocks in segement without advancing the pos.
 func (l *segment) peek(n int64) ([]byte, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if l.pos == l.maxSize-footerSize {
-		return []byte{}, nil
+	if l.size == 0 {
+		return nil, nil
 	}
 
 	if err := l.seekToCurrent(); err != nil {
 		return nil, err
 	}
 
-	//record current pos and restore pos as this value later
-	pos := l.pos
-	if pos < l.maxSize {
-		// make sure n is larger than footerSize
-		if pos == l.maxSize-footerSize {
-			return nil, ErrSegmentFull
+	var buf []byte
+
+	for i := 0; i < int(n); i++ {
+		if l.pos == l.size-footerSize {
+			return nil, io.EOF
 		}
 
-		//
+		// read the record size
 		currentSize, err := l.readUint64()
-		if err != nil {
+		if err == io.EOF {
 			return nil, err
-		} else if int64(currentSize) != n {
-			return nil, ErrSegmentFull
+		} else if err != nil {
+			return buf, err
+		}
+		l.currentSize = int64(currentSize)
+		//
+		if l.currentSize > 0 {
+			// need check currentSize against maxSize.
+			// In some case, file is malformed and
+			// currentSize is not correct.
+			if int64(currentSize) > l.maxSize {
+				return nil, fmt.Errorf("record size out of range: max %d: got %d", l.maxSize, currentSize)
+			}
 		}
 
-		//
+		// prepare bytes array for reading
+		b := make([]byte, currentSize)
+		if err := l.readBytes(b); err != nil {
+			return nil, err
+		}
+		buf = append(buf, b...)
 	}
-
-	return nil, nil
+	return buf, nil
 }
 
 // advance advances the current value pointer
@@ -906,6 +931,7 @@ func (l *segment) advance() error {
 
 	return nil
 }
+
 func (l *segment) totalBytes() int64 {
 	l.mu.RLock()
 	totalB := l.size - footerSize
