@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/zhexuany/influxdb-cluster/rpc"
 	"github.com/zhexuany/influxdb-cluster/tlv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Retention policy settings.
@@ -47,7 +48,7 @@ type store struct {
 	dataChanged chan struct{}
 	path        string
 	opened      bool
-	r           bool
+	isReady     bool
 	logger      *log.Logger
 
 	raftAddr        string
@@ -57,11 +58,6 @@ type store struct {
 	node *influxdb.Node
 
 	raftLn net.Listener
-	//
-	//
-	//
-	//
-	//
 	//
 	//
 	//
@@ -94,8 +90,11 @@ func newStore(c *MetaConfig, httpAddr, raftAddr string) *store {
 		s.logger = log.New(ioutil.Discard, "", 0)
 	}
 
+	func() ([]bytes, error) {
+		return bcrypt.GenerateFromPassword(nil, 1)
+	}()
+
 	return &s
-	//
 }
 
 // open opens and initializes the raft store.
@@ -116,7 +115,7 @@ func (s *store) open(raftln net.Listener) error {
 		return fmt.Errorf("raft: %s", err)
 	}
 	s.mu.Lock()
-	s.r = false
+	s.isReady = false
 	s.mu.Unlock()
 
 	// Wait for a leader to be elected so we know the raft log is loaded
@@ -127,7 +126,7 @@ func (s *store) open(raftln net.Listener) error {
 		}
 
 		s.mu.Lock()
-		s.r = true
+		s.isReady = true
 		s.mu.Unlock()
 
 		// Already have a leader, now start to join cluster
@@ -149,9 +148,9 @@ func (s *store) open(raftln net.Listener) error {
 		}
 	}
 
-	// Leader is ready, so does the cluster
+	// raft Store is ready, so does the cluster
 	s.mu.Lock()
-	s.r = true
+	s.isReady = true
 	s.mu.Unlock()
 	return nil
 }
@@ -242,10 +241,11 @@ func (s *store) raftOpened() bool {
 func (s *store) ready() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.r
+
+	return s.isReady
 }
 
-//
+// reset will reset old raft store and set newly passed store as new raft stroe
 func (s *store) reset(st *store) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -254,28 +254,28 @@ func (s *store) reset(st *store) error {
 		return err
 	}
 
-	// // we have to remove all file in raft path
-	// // directory, since we want to a reset operation.
-	os.RemoveAll(filepath.Join(s.raftState.path, "/*"))
-	os.Remove(filepath.Join(s.path, "raft.db"))
+	// we have to remove all file in raft path
+	// directory, since we want to a reset operation.
+	//
+	err := os.RemoveAll(filepath.Join(s.raftState.path, "/*"))
+	if err != nil {
+		os.Remove(filepath.Join(s.path, "raft.db"))
+	}
 
-	// // reopen the strore after remove all files
-	// if err := s.open(s.raftLn); err != nil {
-	// 	return err
-	// }
-	// if s.raftState == nil {
-	// 	return nil
-	// }
+	st := newStore(nil, "", "")
+	st.path = s.path
+	st.raftState = s.raftState
+	// reopen the strore after remove all files
+	if err := st.open(st.raftLn); err != nil {
+		return err
+	}
+	if s.raftState == nil {
+		// return nil
+	}
 
+	//new object
 	//
-	//
-	//
-	//
-	//
-	//
-	//
-	//
-	//
+	//make ma
 	//
 	return nil
 }
@@ -340,15 +340,15 @@ func (s *store) afterIndex(index uint64) <-chan struct{} {
 	return s.dataChanged
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
+// applied return nil if all preceeding operations have been applied to
+// the FSM. An optional timeout can be provided to limit the amount of
+// time we waite for the command to be started. This must be run on the
+// leader or it will fail.
+// applied return error if some preceeding operations have not been
+// applied to the FSM within the timeout provided provided at run time.
+// The Error() is defined in Future and it will blocks until the future
+// arrives and then return the error satus of the future
+// Note that for same operation, this method can only call once.
 func (s *store) applied(timeout time.Duration) error {
 	return s.raftState.raft.Barrier(timeout).Error()
 }
@@ -452,15 +452,15 @@ func (s *store) dataNode(id uint64) *NodeInfo {
 	return nil
 }
 
-//
+// dataNodeByTCPHost will return a data node according tcpHost
 func (s *store) dataNodeByTCPHost(tcpHost string) *NodeInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	for _, n := range s.data.DataNodes {
 		if tcpHost != "" && n.TCPHost == tcpHost {
-			//
-			//
+			// if tcpHost is empty, then data node
+			// must be nil. We need consider this.
 			return &n
 		}
 	}
@@ -491,14 +491,14 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 	}
 
 	s.mu.RLock()
-	r := s.r
+	isReady := s.isReady
 	s.mu.RUnlock()
 
-	//
-	if l := s.leader(); l == "" && r {
+	// determine raft store has a leader or not
+	if l := s.leader(); l == "" || isReady {
 		// l is empty indicating there is no leader
-		// in cluster. We clost it first and reoopen it
-		//
+		// in cluster. We clost it first with protection of lock
+		// and reoopen it
 		s.mu.RLock()
 		s.raftState.close()
 		s.mu.RUnlock()
@@ -511,23 +511,23 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 			return nil, err
 		}
 
-		// Create Mete Here first
+		// Create Mete Node Here
+		if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
+			return nil, err
+		}
+	} else {
+		// leader is present in cluster, now adding peer
+		s.mu.RLock()
+		if err := s.raftState.addPeer(n.TCPHost); err != nil {
+			s.mu.RUnlock()
+			return nil, err
+		}
+		s.mu.RUnlock()
+
 		if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
 			return nil, err
 		}
 	}
-
-	s.mu.RLock()
-	if err := s.raftState.addPeer(n.TCPHost); err != nil {
-		s.mu.RUnlock()
-		return nil, err
-	}
-	s.mu.RUnlock()
-
-	if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
-		return nil, err
-	}
-
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, node := range s.data.MetaNodes {
@@ -538,7 +538,6 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 	return nil, ErrNodeNotFound
 }
 
-// leave removes a server from the metaservice and raft
 func (s *store) leave(n *NodeInfo) error {
 	s.mu.RLock()
 	if s.raftState == nil {
@@ -605,6 +604,7 @@ func (s *store) deleteMetaNode(id uint64) error {
 	return s.apply(b)
 }
 
+//
 func (s *store) createDataNode(addr, raftAddr string) error {
 	val := &internal.CreateDataNodeCommand{
 		HTTPAddr: proto.String(addr),
@@ -673,6 +673,8 @@ func (s *store) updateDataNode(id uint64, host, tcpHost string) error {
 	return nil
 }
 
+//
+//
 //
 //
 //
