@@ -28,6 +28,9 @@ errcheck:
 	  errcheck -ignorepkg=bytes,fmt -ignore=":(Rollback|Close)" $$pkg \
 	done
 
+get-dep:
+	gdm restore
+
 tools:
 	go get github.com/remyoudompheng/go-misc/deadcode
 	go get github.com/alecthomas/gocyclo
