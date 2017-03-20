@@ -1,9 +1,6 @@
 language: go
 before_script:
   - 
-install:
-  - go get github.com/influxdata/influxdb
-  - go get github.com/naoina/toml
-
+install: make get-deps
 script: go test -v -tags integration ./...
 
