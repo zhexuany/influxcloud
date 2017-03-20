@@ -79,5 +79,11 @@ When a batch points arrives, we apply the rule we just described above to find t
 
 ### How query work in this cluster?
 
+~~~
+query ----> any node in cluster ----->analyse query  ----> if it leader --------> find nodes  -> wait until all distributed query come back -> send all data back to client 
+                                                             |
+                                                             |                          |
+                                                             |----------------->forward to leader 
+~~~
 Query in a cluster are distributed based on time range being queried and the replication factor of the data. For example if the retention policy has a replication factor of 4, the coordinating data node receiving the query randomly picks any of the 4 data nodes that store a replica of the shard(s) to receive the query. If we assume that 
-the system has shard durations of one day, then for each day of time covered by a query the coordinating node will select one data node to receive the query for that day. The coordinating node will execute and fulfill the query locally whenever possible. If a query must scan multiple shard groups (multiple days in our example above), the coordinating node will will forward queries to other nodes for shard(s) it does not have locally. The queries are forwarded in parallel to scanning its own local data. The queries are distributed to as many nodes as required to query each shard group once. As the results come back from each data node, the coordinating data node combines them into the final result that gets returned to the user.
+the system has shard durations of one day, then for each day of time covered by a query the coordinating node will select one data node to receive the query for that day. The coordinating node will execute and fulfill the query locally whenever possible. If a query must scan multiple shard groups (multiple days in our example above), the node will will forward queries to other nodes for shard(s) it does not have locally. The queries are forwarded in parallel to scanning its own local data. The queries are distributed to as many nodes as required to query each shard group once. As the results come back from each data node, the node combines them into the final result that gets returned to the user.
