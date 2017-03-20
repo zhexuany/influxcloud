@@ -3,7 +3,7 @@ In order to improve the availability of influxDB, we create this project. The or
 if influxdata changes a lot interface and method signautre. Hence, we change our plan and decide not to intrude influxDB too much. Please think this as a plugin, we will extract 
 some code from influxDB for our own benefit.
 
-## Architure 
+## Architecture
     ┌───────┐     ┌───────┐      
     │       │     │       │      
     │ node1 │◀───▶│ node2 │      
