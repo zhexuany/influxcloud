@@ -44,7 +44,7 @@ is
 
 
 ~~~
-points ----> any node in cluster ----->merge points  ----> if it leader --------> find nodes  -> buffer write in hinted handoff
+points ----> any node in cluster ----->merge points  ----> if it is leader --------> find nodes  -> buffer write in hinted handoff
                                                              |
                                                              |                          |
                                                              |----------------->forward to leader 
@@ -80,7 +80,7 @@ When a batch points arrives, we apply the rule we just described above to find t
 ### How query work in this cluster?
 
 ~~~
-query ----> any node in cluster ----->analyse query  ----> if it leader --------> find nodes  -> wait until all distributed query come back -> send all data back to client 
+query ----> any node in cluster ----->analyse query  ----> if it is leader --------> find nodes  -> wait until all distributed query come back -> send all data back to client 
                                                              |
                                                              |                          |
                                                              |----------------->forward to leader 
