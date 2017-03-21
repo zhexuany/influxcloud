@@ -3,11 +3,11 @@ package meta
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/services/meta"
 	"github.com/zhexuany/influxdb-cluster/meta/internal"
 )
 
@@ -29,15 +29,21 @@ const (
 
 // Data represents the top level collection of all metadata.
 type Data struct {
+	// This is coupled with influxdb's implementation, but the structure is pretty
+	// stable, hence we can use it.
+	*meta.Data
 	MetaNodes NodeInfos
 	DataNodes NodeInfos
-	Users     []UserInfo
 	MaxNodeID uint64
 }
 
 // Clone returns a copy of data with a new version.
 func (data *Data) Clone() *Data {
 	other := *data
+
+	// Clone DatabaseInfo
+	other.Data = data.Data.Clone()
+
 	//copy meta nodes
 	if data.MetaNodes != nil {
 		other.MetaNodes = make([]NodeInfo, len(data.MetaNodes))
@@ -53,8 +59,6 @@ func (data *Data) Clone() *Data {
 			other.DataNodes[i] = data.DataNodes[i].clone()
 		}
 	}
-	//copy users information
-	other.Users = data.CloneUsers()
 
 	return &other
 }
@@ -231,20 +235,20 @@ func (data *Data) DeleteMetaNode(id uint64) error {
 				// dropping from the list of potential new owner.
 				delete(nodeOwnerFreqs, int(id))
 
-				// for _, orphan := range orphanedShards {
-				// newOwnerID, err := newShardOwner(orphan, nodeOwnerFreqs)
-				// if err != nil {
-				// 	return err
-				// }
+				for _, orphan := range orphanedShards {
+					newOwnerID, err := meta.NewShardOwner(orphan, nodeOwnerFreqs)
+					if err != nil {
+						return err
+					}
 
-				// for si, s := range sg.Shards {
-				// 	if s.ID == orphan.ID {
-				// 		sg.Shards[si].Owners = append(sg.Shards[si].Owners, ShardOwner{NodeID: newOwnerID})
-				// 		data.Data.Databases[di].RetentionPolicies[ri].ShardGroups[sgi].Shards = sg.Shards
-				// 		break
-				// 	}
-				// }
-				// }
+					for si, s := range sg.Shards {
+						if s.ID == orphan.ID {
+							sg.Shards[si].Owners = append(sg.Shards[si].Owners, meta.ShardOwner{NodeID: newOwnerID})
+							data.Data.Databases[di].RetentionPolicies[ri].ShardGroups[sgi].Shards = sg.Shards
+							break
+						}
+					}
+				}
 			}
 		}
 	}
@@ -560,114 +564,6 @@ func (data *Data) PruneShard(si *meta.ShardInfo, nodeID uint64) ([]meta.ShardOwn
 	return nil, fmt.Errorf("failed to find shard owner %d", nodeID)
 }
 
-//TODO all role can be waited until cluster works fine
-func (data *Data) CreateRole() error {
-	return nil
-}
-
-func (data *Data) DropRole(role RoleInfo) error {
-	// ridx := -1
-	// for i, _ := range data.Roles {
-	// 	if role.Users == data.Roles[i].Users {
-	// 		ridx = i
-	// 		break
-	// 	}
-	// }
-
-	// if ridx != -1 {
-	// 	return errors.New("role not found")
-	// }
-	// data.Rol
-	// es = copy
-	return nil
-}
-
-func (data *Data) Role(name string) *RoleInfo {
-	// for i := rang data.Roles {
-	// 	if data.Roles[i].Name == name {
-	// 		return &data.Roles[i]
-	// 	}
-	// }
-	return nil
-}
-
-func (data *Data) role() {
-
-}
-
-func (data *Data) AddRoleUsers() {
-}
-
-func (data *Data) RemoveRoleUsers() {
-	//roles.RemoveUsers
-}
-
-func (data *Data) AddRolePermissions() {
-
-}
-
-func (data *Data) RemoveRolePermissions() {
-
-}
-
-func (data *Data) ChangeRoleName() {
-
-}
-
-// User returns a user by username.
-func (data *Data) User(username string) *UserInfo {
-	for i := range data.Users {
-		if data.Users[i].Name == username {
-			return &data.Users[i]
-		}
-	}
-	return nil
-}
-func (data *Data) user() {
-
-}
-
-// CreateUser creates a new user.
-func (data *Data) CreateUser(name, hash string, admin bool) error {
-	// Ensure the user doesn't already exist.
-	if name == "" {
-		return ErrUsernameRequired
-	} else if data.User(name) != nil {
-		return ErrUserExists
-	}
-
-	// Append new user.
-	data.Users = append(data.Users, UserInfo{
-		UserInfo: meta.UserInfo{
-			Name:  name,
-			Hash:  hash,
-			Admin: admin,
-		},
-	})
-
-	return nil
-}
-
-// DropUser removes an existing user by name.
-func (data *Data) DropUser(name string) error {
-	for i := range data.Users {
-		if data.Users[i].Name == name {
-			data.Users = append(data.Users[:i], data.Users[i+1:]...)
-			return nil
-		}
-	}
-	return ErrUserNotFound
-}
-
-func (data *Data) SetUserPassword(pass string) error {
-	return nil
-}
-
-func (data *Data) AddUserPermissions() error {
-	return nil
-}
-
-//TODO finish this until we have a demo to run
 func (data *Data) ImportData(buf []byte) error {
 	// other := Data{}
 	// if err := other.UnmarshalBinary(buf); err != nil {
@@ -690,17 +586,6 @@ func (data *Data) ImportData(buf []byte) error {
 	// }
 	//sort
 	//call gcd
-	return nil
-}
-
-//TODO (zhexuany) do not worry about this until alpha version
-type UserInfo struct {
-	meta.UserInfo
-	Privileges ScopedPermissions
-}
-
-func (u *UserInfo) unmarshal(pb internal.UserInfo) error {
-	// return u.Privileges.unmarshal()
 	return nil
 }
 

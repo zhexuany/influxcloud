@@ -18,8 +18,6 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
-	"github.com/zhexuany/influxdb-cluster/rpc"
-	"github.com/zhexuany/influxdb-cluster/tlv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -66,13 +64,12 @@ func newStore(c *MetaConfig, httpAddr, raftAddr string) *store {
 				Index: 1,
 			},
 		},
-		closing:         make(chan struct{}),
-		dataChanged:     make(chan struct{}),
-		copyShardStatus: make(map[string]int64),
-		path:            c.Dir,
-		config:          c,
-		httpAddr:        httpAddr,
-		raftAddr:        raftAddr,
+		closing:     make(chan struct{}),
+		dataChanged: make(chan struct{}),
+		path:        c.Dir,
+		config:      c,
+		httpAddr:    httpAddr,
+		raftAddr:    raftAddr,
 	}
 	if c.LoggingEnabled {
 		s.logger = log.New(os.Stderr, "[metastore] ", log.LstdFlags)
@@ -80,7 +77,7 @@ func newStore(c *MetaConfig, httpAddr, raftAddr string) *store {
 		s.logger = log.New(ioutil.Discard, "", 0)
 	}
 
-	func() ([]bytes, error) {
+	func() ([]byte, error) {
 		return bcrypt.GenerateFromPassword(nil, 1)
 	}()
 
@@ -241,7 +238,6 @@ func (s *store) reset(st *store) error {
 		os.Remove(filepath.Join(s.path, "raft.db"))
 	}
 
-	st := newStore(nil, "", "")
 	st.path = s.path
 	st.raftState = s.raftState
 	// reopen the strore after remove all files
@@ -465,12 +461,8 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 		return nil, fmt.Errorf("strore is not ready yet. Try again later.")
 	}
 
-	s.mu.RLock()
-	isReady := s.isReady
-	s.mu.RUnlock()
-
 	// determine raft store has a leader or not
-	if l := s.leader(); l == "" || isReady {
+	if l := s.leader(); l == "" {
 		// l is empty indicating there is no leader
 		// in cluster. We clost it first with protection of lock
 		// and reoopen it

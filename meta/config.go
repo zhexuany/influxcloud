@@ -34,10 +34,6 @@ const (
 	// DefaultElectionTimeout is the default election timeout for the store.
 	DefaultElectionTimeout = 1000 * time.Millisecond
 
-	DefaultGossipFrequency = 5 * 1000 * time.Millisecond
-
-	DefaultAnnouncementExpiration = 30 * 1000 * time.Millisecond
-
 	// DefaultLeaderLeaseTimeout is the default leader lease for the store.
 	DefaultLeaderLeaseTimeout = 500 * time.Millisecond
 
@@ -62,19 +58,17 @@ type Config struct {
 // NewConfig builds a new configuration with default values.
 func NewConfig() *Config {
 	meta := &MetaConfig{
-		Enabled:                true, // enabled by default
-		BindAddress:            DefaultRaftBindAddress,
-		HTTPBindAddress:        DefaultHTTPBindAddress,
-		RetentionAutoCreate:    true,
-		Gossipfrequency:        toml.Duration(DefaultGossipFrequency),
-		Announcementexpiration: toml.Duration(DefaultAnnouncementExpiration),
-		ElectionTimeout:        toml.Duration(DefaultElectionTimeout),
-		HeartbeatTimeout:       toml.Duration(DefaultHeartbeatTimeout),
-		LeaderLeaseTimeout:     toml.Duration(DefaultLeaderLeaseTimeout),
-		CommitTimeout:          toml.Duration(DefaultCommitTimeout),
-		RaftPromotionEnabled:   DefaultRaftPromotionEnabled,
-		LeaseDuration:          toml.Duration(DefaultLeaseDuration),
-		LoggingEnabled:         DefaultLoggingEnabled,
+		Enabled:              true, // enabled by default
+		BindAddress:          DefaultRaftBindAddress,
+		HTTPBindAddress:      DefaultHTTPBindAddress,
+		RetentionAutoCreate:  true,
+		ElectionTimeout:      toml.Duration(DefaultElectionTimeout),
+		HeartbeatTimeout:     toml.Duration(DefaultHeartbeatTimeout),
+		LeaderLeaseTimeout:   toml.Duration(DefaultLeaderLeaseTimeout),
+		CommitTimeout:        toml.Duration(DefaultCommitTimeout),
+		RaftPromotionEnabled: DefaultRaftPromotionEnabled,
+		LeaseDuration:        toml.Duration(DefaultLeaseDuration),
+		LoggingEnabled:       DefaultLoggingEnabled,
 	}
 	return &Config{
 		Meta: meta,
@@ -255,22 +249,19 @@ type MetaConfig struct {
 	HTTPSEnabled     bool   `toml:"https-enabled"`
 	HTTPSCertificate string `toml:"https-certificate"`
 
-	RetentionAutoCreate    bool          `toml:"retention-autocreate"`
-	Gossipfrequency        toml.Duration `toml:"gossip-frequency"`
-	Announcementexpiration toml.Duration `toml:"announcement-expiration"`
-	ElectionTimeout        toml.Duration `toml:"election-timeout"`
-	HeartbeatTimeout       toml.Duration `toml:"heartbeat-timeout"`
-	LeaderLeaseTimeout     toml.Duration `toml:"leader-lease-timeout"`
-	CommitTimeout          toml.Duration `toml:"commit-timeout"`
-	ClusterTracing         bool          `toml:"cluster-tracing"`
-	RaftPromotionEnabled   bool          `toml:"raft-promotion-enabled"`
-	LoggingEnabled         bool          `toml:"logging-enabled"`
-	PprofEnabled           bool          `toml:"pprof-enabled"`
+	RetentionAutoCreate  bool          `toml:"retention-autocreate"`
+	ElectionTimeout      toml.Duration `toml:"election-timeout"`
+	HeartbeatTimeout     toml.Duration `toml:"heartbeat-timeout"`
+	LeaderLeaseTimeout   toml.Duration `toml:"leader-lease-timeout"`
+	CommitTimeout        toml.Duration `toml:"commit-timeout"`
+	ClusterTracing       bool          `toml:"cluster-tracing"`
+	RaftPromotionEnabled bool          `toml:"raft-promotion-enabled"`
+	LoggingEnabled       bool          `toml:"logging-enabled"`
+	PprofEnabled         bool          `toml:"pprof-enabled"`
 
 	LeaseDuration toml.Duration `toml:"lease-duration"`
 }
 
-//TODO add more criterias
 func (m *MetaConfig) Validate() error {
 	if m.Dir == "" {
 		return errors.New("Meta.Dir must be specified")

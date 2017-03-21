@@ -77,7 +77,6 @@ func NewClient(config *MetaConfig) *Client {
 		closing:             make(chan struct{}),
 		cacheData:           &Data{},
 		logger:              log.New(os.Stderr, "[metaclient] ", log.LstdFlags),
-		authCache:           make(map[string]authUser, 0),
 		path:                config.Dir,
 		retentionAutoCreate: config.RetentionAutoCreate,
 		config:              config,
@@ -113,8 +112,6 @@ func (c *Client) Open() error {
 	}
 	c.SetData(c.cacheData)
 
-	//
-	c.updateAuthCache()
 	if err := c.updateMetaServers(); err != nil {
 		c.Logger().Println("failed to updated meta servers")
 	}
@@ -750,75 +747,9 @@ func (c *Client) UpdateRetentionPolicy(database, name string, rpu *meta.Retentio
 	return c.retryUntilExec(internal.Command_UpdateRetentionPolicyCommand, internal.E_UpdateRetentionPolicyCommand_Command, cmd)
 }
 
-func (c *Client) Users() []UserInfo {
-	users := c.data().Users
-
-	if users == nil {
-		return []UserInfo{}
-	}
-
-	return users
-}
-
-func (c *Client) User(name string) (*UserInfo, error) {
-	for _, u := range c.data().Users {
-		if u.Name == name {
-			return &u, nil
-		}
-	}
-
-	return nil, ErrUserNotFound
-}
-
 // bcryptCost is the cost associated with generating password with bcrypt.
 // This setting is lowered during testing to improve test suite performance.
 var bcryptCost = bcrypt.DefaultCost
-
-func (c *Client) toOSUser() {}
-
-func (c *Client) CreateUser(name, password string, admin bool) (*UserInfo, error) {
-	data := c.cacheData.Clone()
-
-	// See if the user already exists.
-	if u := data.User(name); u != nil {
-		if err := bcrypt.CompareHashAndPassword([]byte(u.Hash), []byte(password)); err != nil || u.Admin != admin {
-			return nil, ErrUserExists
-		}
-		return u, nil
-	}
-
-	// Hash the password before serializing it.
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := c.retryUntilExec(internal.Command_CreateUserCommand, internal.E_CreateUserCommand_Command,
-		&internal.CreateUserCommand{
-			Name:  proto.String(name),
-			Hash:  proto.String(string(hash)),
-			Admin: proto.Bool(admin),
-		},
-	); err != nil {
-		return nil, err
-	}
-	return c.User(name)
-}
-
-func (c *Client) UpdateUser(name, password string) error {
-	// Hash the password before serializing it.
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
-	if err != nil {
-		return err
-	}
-
-	return c.retryUntilExec(internal.Command_UpdateUserCommand, internal.E_UpdateUserCommand_Command,
-		&internal.UpdateUserCommand{
-			Name: proto.String(name),
-			Hash: proto.String(string(hash)),
-		},
-	)
-}
 
 // ShardIDs returns a list of all shard ids.
 func (c *Client) ShardIDs() []uint64 {
@@ -1288,7 +1219,6 @@ func (c *Client) pollForUpdates() {
 		c.mu.Lock()
 		idx := c.cacheData.Data.Index
 		c.cacheData = data
-		c.updateAuthCache()
 		if idx < data.Data.Index {
 			close(c.changed)
 			c.changed = make(chan struct{})

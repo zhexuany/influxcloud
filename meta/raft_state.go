@@ -7,14 +7,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/raft"
 	"github.com/hashicorp/raft-boltdb"
-	"unicode"
-	"unicode/utf8"
 )
 
 // Raft configuration.
