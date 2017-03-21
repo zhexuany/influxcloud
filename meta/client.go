@@ -59,10 +59,6 @@ type Client struct {
 	HTTPClient  *http.Client
 	metaServers []string
 
-	// Authentication cache.
-	authCache map[string]authUser
-	authInfo  string
-
 	path string
 
 	retentionAutoCreate bool
@@ -88,8 +84,6 @@ func NewClient(config *MetaConfig) *Client {
 	}
 }
 
-//
-//
 // Open a connection to a meta service cluster.
 func (c *Client) Open() error {
 	if c.closed() {
@@ -125,7 +119,6 @@ func (c *Client) Open() error {
 		c.Logger().Println("failed to updated meta servers")
 	}
 
-	//TODO may be a goroutine here
 	c.Logger().Println("")
 
 	return nil
@@ -251,18 +244,6 @@ func (c *Client) SetTLS(v bool) {
 	c.mu.RLock()
 	c.mu.RUnlock()
 	c.tls = v
-}
-
-func (c *Client) AuthInfo() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.authInfo
-}
-
-func (c *Client) SetAuthInfo(authInfo string) {
-	c.mu.Lock()
-	c.authInfo = authInfo
-	c.mu.Unlock()
 }
 
 func (c *Client) SetHTTPClient(httpClient *http.Client) {
@@ -483,7 +464,6 @@ func (c *Client) UpdateDataNode(id uint64, host, tcpHost string) error {
 		return err
 	}
 
-	//TODO not sure why update nodeID
 	c.nodeID = n.ID
 
 	return nil
@@ -677,7 +657,6 @@ func (c *Client) CreateRetentionPolicy(database string, spec *meta.RetentionPoli
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
-	//TODO have to figure why do this
 	_, err := spec.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -839,101 +818,6 @@ func (c *Client) UpdateUser(name, password string) error {
 			Hash: proto.String(string(hash)),
 		},
 	)
-}
-
-func (c *Client) DropUser(name string) error {
-	return c.retryUntilExec(internal.Command_DropUserCommand, internal.E_DropUserCommand_Command,
-		&internal.DropUserCommand{
-			Name: proto.String(name),
-		},
-	)
-}
-
-func (c *Client) SetPrivilege(username, database string, p influxql.Privilege) error {
-	return c.retryUntilExec(internal.Command_SetPrivilegeCommand, internal.E_SetPrivilegeCommand_Command,
-		&internal.SetPrivilegeCommand{
-			Username:  proto.String(username),
-			Database:  proto.String(database),
-			Privilege: proto.Int32(int32(p)),
-		},
-	)
-}
-
-func (c *Client) SetAdminPrivilege(username string, admin bool) error {
-	return c.retryUntilExec(internal.Command_SetAdminPrivilegeCommand, internal.E_SetAdminPrivilegeCommand_Command,
-		&internal.SetAdminPrivilegeCommand{
-			Username: proto.String(username),
-			Admin:    proto.Bool(admin),
-		},
-	)
-}
-
-// TODO revisite this later
-func (c *Client) updateUserPermissions() {
-}
-
-func (c *Client) UserPrivileges(username string) (map[string]influxql.Privilege, error) {
-	p, err := c.data().Data.UserPrivileges(username)
-	if err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (c *Client) UserPrivilege(username, database string) (*influxql.Privilege, error) {
-	p, err := c.data().Data.UserPrivilege(username, database)
-	if err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (c *Client) AdminUserExists() bool {
-	for _, u := range c.data().Data.Users {
-		if u.Admin {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *Client) Authenticate(username, password string) (*UserInfo, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	// Find user.
-	userInfo := c.cacheData.User(username)
-	if userInfo == nil {
-		return nil, ErrUserNotFound
-	}
-
-	// Check the local auth cache first.
-	if au, ok := c.authCache[username]; ok {
-		// verify the password using the cached salt and hash
-		if bytes.Equal(hashWithSalt(au.salt, password), au.hash) {
-			return userInfo, nil
-		}
-
-		// fall through to requiring a full bcrypt hash for invalid passwords
-	}
-
-	// Compare password with user hash.
-	if err := bcrypt.CompareHashAndPassword([]byte(userInfo.Hash), []byte(password)); err != nil {
-		return nil, ErrAuthenticate
-	}
-
-	// generate a salt and hash of the password for the cache
-	salt, hashed, err := saltedHash(password)
-	if err != nil {
-		return nil, err
-	}
-	c.authCache[username] = authUser{salt: salt, hash: hashed, bhash: userInfo.Hash}
-
-	return userInfo, nil
-}
-
-func (c *Client) UserCount() int {
-	return len(c.data().Data.Users)
 }
 
 // ShardIDs returns a list of all shard ids.
@@ -1459,26 +1343,6 @@ func (c *Client) retryUntilSnapshot(idx uint64) *Data {
 
 		currentServer++
 	}
-}
-
-func (c *Client) updateAuthCache() {
-	// copy cached user info for still-present users
-	newCache := make(map[string]authUser, len(c.authCache))
-
-	for _, userInfo := range c.cacheData.Users {
-		c.mu.RLock()
-		cached, ok := c.authCache[userInfo.Name]
-		c.mu.RUnlock()
-		if ok {
-			if cached.bhash == userInfo.Hash {
-				c.mu.Lock()
-				newCache[userInfo.Name] = cached
-				c.mu.Unlock()
-			}
-		}
-	}
-
-	c.authCache = newCache
 }
 
 func (c *Client) updateMetaServers() error {

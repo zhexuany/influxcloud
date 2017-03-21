@@ -180,7 +180,6 @@ func (s *Server) Open() error {
 	return nil
 }
 
-//TODO need revist this
 func (s *Server) initializeMetaClient() {
 	s.MetaClient.SetMetaServers(nil)
 	s.MetaClient.SetTLS(s.config.Meta.HTTPSEnabled)
