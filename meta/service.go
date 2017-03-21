@@ -74,31 +74,6 @@ func (s *Service) Version() string {
 	return s.version
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
 // Open starts the service
 func (s *Service) Open() error {
 	s.Logger.Println("Starting meta service")
@@ -172,11 +147,7 @@ func (s *Service) Open() error {
 	handler.logger = s.Logger
 	handler.store = s.store
 	s.handler = handler
-	//TODO
 
-	//
-	//
-	s.handler.startGossiping()
 	return nil
 }
 

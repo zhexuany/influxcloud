@@ -224,38 +224,6 @@ func (s *Server) startServerReporting() {
 	}
 }
 
-// reportServer reports usage statistics about the system.
-func (s *Server) reportServer() {
-	// dis, _ := s.MetaClient.Databases()
-	// numDatabases := len(dis)
-
-	// numMeasurements := 0
-	// numSeries := 0
-
-	// clusterID := s.MetaClient.ClusterID()
-	// usage := client.Usage{
-	// 	Product: "influxdb",
-	// 	Data: []client.UsageData{
-	// 		{
-	// 			Values: client.Values{
-	// 				"os":               runtime.GOOS,
-	// 				"arch":             runtime.GOARCH,
-	// 				"version":          s.buildInfo.Version,
-	// 				"cluster_id":       fmt.Sprintf("%v", clusterID),
-	// 				"num_series":       numSeries,
-	// 				"num_measurements": numMeasurements,
-	// 				"num_databases":    numDatabases,
-	// 				"uptime":           time.Since(startTime).Seconds(),
-	// 			},
-	// 		},
-	// 	},
-	// }
-
-	s.Logger.Printf("Sending usage statistics to usage.influxdata.com")
-
-	// go cl.Save(usage)
-}
-
 // monitorErrorChan reads an error channel and resends it through the server.
 func (s *Server) monitorErrorChan(ch <-chan error) {
 	for {

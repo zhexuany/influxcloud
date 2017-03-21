@@ -119,7 +119,6 @@ func (c *Client) Open() error {
 	c.Logger().Println("")
 
 	return nil
-
 }
 
 // Close the meta service cluster connection.
@@ -936,7 +935,7 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 			}
 			server := metaServers[currentServer]
 
-			url = server + "/join"
+			url = server + "/add/meta"
 		}
 
 		resp, err := c.post(url, "aplication/json", bytes.NewBuffer(b))

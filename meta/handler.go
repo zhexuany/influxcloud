@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/pprof"
-	// "net/url"
 	"os"
 	"runtime"
 	"strconv"
@@ -40,6 +39,13 @@ type handler struct {
 		snapshot() (*Data, error)
 		apply(b []byte) error
 		join(n *NodeInfo) (*NodeInfo, error)
+		removePeer(peer string) error
+		leave(n *NodeInfo) error
+		createDataNode(addr, raftAddr string) error
+		updateDataNode(id uint64, host, tcpHost string) error
+		deleteDataNode(id uint64) error
+		createMetaNode(addr, raftAddr string) error
+		deleteMetaNode(id uint64) error
 		otherMetaServersHTTP() []string
 		peers() []string
 	}
@@ -99,39 +105,15 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/execute":
 			h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
-		case "/add-data":
+		case "/add/data":
 			h.WrapHandler("add-data", h.serveAddData).ServeHTTP(w, r)
+		case "/add/meta":
+			h.WrapHandler("add-meta", h.serveAddMeta).ServeHTTP(w, r)
+
 		}
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 	}
-}
-
-func (h *handler) do() {
-	// u := url.URL.String()
-	// req := http.NewRequest("http", u)
-	// http.Header.Set(k, v) fmt.Sprintf
-	// h.mu.RLock()
-	// h.mu.RUnlock()
-	//http.Do
-	//time now
-}
-
-func (h *handler) get() {
-	h.do()
-}
-
-func (h *handler) post() {
-	h.do()
-}
-func (h *handler) postform() {
-	//net.url.Va
-	// url.Values.Encode()
-	h.do()
-}
-
-func (h *handler) startGossiping() {
-
 }
 
 func (h *handler) Close() error {
@@ -157,77 +139,77 @@ func (h *handler) isClosed() bool {
 	}
 }
 
-func (h *handler) redirectLeader() {
-	//http.Redirect
-	//jsonError
-}
+func (h *handler) redirectLeader(w http.ResponseWriter, r *http.Request, url string) {
+	l := h.store.leaderHTTP()
+	if l == "" {
+		// No cluster leader. Client will have to try again latr.
+		h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
+	}
+	scheme := "http://"
+	if h.config.HTTPSEnabled {
+		scheme = "https://"
+	}
 
-func (h *handler) machineEntitled() {
-
+	l = scheme + l + url
+	http.Redirect(w, r, l, http.StatusTemporaryRedirect)
 }
 
 func (h *handler) serveJoin(w http.ResponseWriter, r *http.Request) {
-	// if h.isClosed() {
-	// 	h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-	// 	return
-	// }
-	// n := &NodeInfo{}
-	// if err := json.Unmarshal(body, n); err != nil {
-	// 	h.httpError(err, w, http.StatusInternalServerError)
-	// 	return
-	// }
+	if h.isClosed() {
+		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
+		return
+	}
 
-	// // if resp, err := http.PostForm(h.config.Meta.RemoteHostname, data); err != nil {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		h.httpError(err, w, http.StatusBadRequest)
+		return
+	}
 
-	// // }
+	n := &NodeInfo{}
+	if err := json.Unmarshal(body, n); err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
 
-	// node, err := h.store.join(n)
-	// if err == raft.ErrNotLeader {
-	// 	l := h.store.leaderHTTP()
-	// 	if l == "" {
-	// 		// No cluster leader. Client will have to try again later.
-	// 		h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-	// 		return
-	// 	}
-	// 	scheme := "http://"
-	// 	if h.config.HTTPSEnabled {
-	// 		scheme = "https://"
-	// 	}
+	node, err := h.store.join(n)
+	if err == raft.ErrNotLeader {
+		h.redirectLeader(w, r, "/join")
+		return
+	}
 
-	// 	l = scheme + l + "/join"
-	// 	http.Redirect(w, r, l, http.StatusTemporaryRedirect)
-	// 	return
-	// }
-
-	// if err != nil {
-	// 	h.httpError(err, w, http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// // Return the node with newly assigned ID as json
-	// w.Header().Add("Content-Type", "application/json")
-	// if err := json.NewEncoder(w).Encode(node); err != nil {
-	// 	h.jsonError(err, w, http.StatusInternalServerError)
-	// }
-
-	// return
-
-	// http.PostForm(url, data)
-	// h.get()
-	// json.Decoder.Decode(v)
-	// jsonError()
-	// http.Header.Add(k, v)
-	// json.Encoder.Encode(v)
-	// jsonError()
-	// h.postform()
+	// Return the node with newly assigned ID as json
+	w.Header().Add("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(node); err != nil {
+		h.jsonError(err, w, http.StatusInternalServerError)
+	}
 }
 
 func (h *handler) serveLeave(w http.ResponseWriter, r *http.Request) {
-	h.postform()
-}
+	if h.isClosed() {
+		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
+		return
+	}
 
-func (h *handler) serveRemoveMeta(w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		h.httpError(err, w, http.StatusBadRequest)
+		return
+	}
 
+	n := &NodeInfo{}
+	if err := json.Unmarshal(body, n); err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	err = h.store.leave(n)
+	if err == raft.ErrNotLeader {
+		h.redirectLeader(w, r, "/leave")
+		return
+	} else {
+		h.jsonError(err, w, http.StatusInternalServerError)
+	}
 }
 
 func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
@@ -235,10 +217,11 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
 		return
 	}
-	n := &NodeInfo{}
-	body := []byte{}
-	if err := json.Unmarshal(body, n); err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
+
+	addr := r.URL.Query().Get("addr")
+	raftAddr := r.URL.Query().Get("raftAddr")
+	if addr == "" || raftAddr == "" {
+		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
 		return
 	}
 
@@ -246,21 +229,40 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 		h.httpError(err, w, http.StatusInternalServerError)
 	}
 
-	node, err := h.store.join(n)
+	err := h.store.createDataNode(addr, raftAddr)
 	if err == raft.ErrNotLeader {
-		l := h.store.leaderHTTP()
-		if l == "" {
-			// No cluster leader. Client will have to try again later.
-			h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-			return
-		}
-		scheme := "http://"
-		if h.config.HTTPSEnabled {
-			scheme = "https://"
-		}
+		h.redirectLeader(w, r, "/add/data")
+		return
+	}
 
-		l = scheme + l + "/add-data"
-		http.Redirect(w, r, l, http.StatusTemporaryRedirect)
+	if err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+
+	return
+}
+
+func (h *handler) serveRemoveData(w http.ResponseWriter, r *http.Request) {
+	if h.isClosed() {
+		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+
+	id, err := strconv.ParseUint(idStr, 64, 128)
+	if err != nil {
+		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
+		return
+
+	}
+
+	err = h.store.deleteDataNode(id)
+	if err == raft.ErrNotLeader {
+		h.redirectLeader(w, r, "/delete/data")
 		return
 	}
 
@@ -271,15 +273,79 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 
 	// Return the node with newly assigned ID as json
 	w.Header().Add("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(node); err != nil {
-		h.jsonError(err, w, http.StatusInternalServerError)
-	}
 
 	return
 }
 
-func (h *handler) incrementInternalRF(w http.ResponseWriter, r *http.Request) {
+func (h *handler) serveUpdateData(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func (h *handler) verifyDataNode() {
+
+}
+
+func (h *handler) serveAddMeta(w http.ResponseWriter, r *http.Request) {
+	if h.isClosed() {
+		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
+		return
+	}
+
+	addr := r.URL.Query().Get("addr")
+	raftAddr := r.URL.Query().Get("raftAddr")
+
+	if addr == "" || raftAddr == "" {
+		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
+		return
+	}
+
+	err := h.store.createMetaNode(addr, raftAddr)
+	if err == raft.ErrNotLeader {
+		h.redirectLeader(w, r, "/add/meta")
+		return
+	}
+
+	if err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Return the node with newly assigned ID as json
+	w.Header().Add("Content-Type", "application/json")
+
+	return
+}
+
+func (h *handler) serveRemoveMeta(w http.ResponseWriter, r *http.Request) {
+	if h.isClosed() {
+		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
+		return
+	}
+
+	idStr := r.URL.Query().Get("id")
+
+	id, err := strconv.ParseUint(idStr, 64, 128)
+	if err != nil {
+		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
+		return
+
+	}
+
+	err = h.store.deleteMetaNode(id)
+	if err == raft.ErrNotLeader {
+		h.redirectLeader(w, r, "/delete/meta")
+		return
+	}
+
+	if err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Return the node with newly assigned ID as json
+	w.Header().Add("Content-Type", "application/json")
+
+	return
 }
 
 type RPCCall struct {
@@ -293,19 +359,7 @@ func (h *handler) sendDataNodeJoin() {
 
 }
 
-func (h *handler) serveRemoveData(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func (h *handler) sendDataNodeLeave() {
-
-}
-
-func (h *handler) serveUpdateData(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) verifyDataNode() {
 
 }
 
@@ -334,19 +388,7 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.apply(body); err != nil {
 		// If we aren't the leader, redirect client to the leader.
 		if err == raft.ErrNotLeader {
-			l := h.store.leaderHTTP()
-			if l == "" {
-				// No cluster leader. Client will have to try again later.
-				h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-				return
-			}
-			scheme := "http://"
-			if h.config.HTTPSEnabled {
-				scheme = "https://"
-			}
-
-			l = scheme + l + "/execute"
-			http.Redirect(w, r, l, http.StatusTemporaryRedirect)
+			h.redirectLeader(w, r, "/execute")
 			return
 		}
 
@@ -373,10 +415,6 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	// Send response to client.
 	w.Header().Add("Content-Type", "application/octet-stream")
 	w.Write(b)
-}
-
-func (h *handler) serveRemoveShard(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func validateCommand(b []byte) error {
@@ -424,10 +462,6 @@ func (h *handler) serveSnapshot(w http.ResponseWriter, r *http.Request) {
 		h.httpError(fmt.Errorf("server closed"), w, http.StatusInternalServerError)
 		return
 	}
-}
-
-func (h *handler) serveRestoreMeta(w http.ResponseWriter, r *http.Request) {
-
 }
 
 // servePing will return if the server is up, or if specified will check the status
@@ -482,6 +516,7 @@ func (h *handler) serveStatus(w http.ResponseWriter, r *http.Request) {
 func (h *handler) serveShowCluster(w http.ResponseWriter, r *http.Request) {
 
 }
+
 func (h *handler) serveShowShards(w http.ResponseWriter, r *http.Request) {
 
 }
@@ -645,8 +680,4 @@ func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
 		h.logger.Println(err)
 	}
 	http.Error(w, "", status)
-}
-
-func requiredParameters() {
-
 }
