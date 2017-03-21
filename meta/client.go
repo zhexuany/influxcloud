@@ -74,12 +74,6 @@ type Client struct {
 	config *MetaConfig
 }
 
-type authUser struct {
-	bhash string
-	salt  []byte
-	hash  []byte
-}
-
 // NewClient returns a new *Client.
 func NewClient(config *MetaConfig) *Client {
 	return &Client{
@@ -92,11 +86,6 @@ func NewClient(config *MetaConfig) *Client {
 		retentionAutoCreate: config.RetentionAutoCreate,
 		config:              config,
 	}
-	//
-	//
-	//
-	//
-	//
 }
 
 //
@@ -107,9 +96,6 @@ func (c *Client) Open() error {
 		return ErrServiceUnavailable
 	}
 
-	// retrrev meta data's path
-	//
-	//
 	path := c.Path()
 	if path != "" {
 		c.Logger().Printf("using client state dir:%s", path)

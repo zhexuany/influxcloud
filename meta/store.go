@@ -48,7 +48,6 @@ type store struct {
 	dataChanged chan struct{}
 	path        string
 	opened      bool
-	isReady     bool
 	logger      *log.Logger
 
 	raftAddr string
@@ -105,9 +104,6 @@ func (s *store) open(raftln net.Listener) error {
 	if err := s.openRaft(raftln); err != nil {
 		return fmt.Errorf("raft: %s", err)
 	}
-	s.mu.Lock()
-	s.isReady = false
-	s.mu.Unlock()
 
 	// Wait for a leader to be elected so we know the raft log is loaded
 	// and up to date
@@ -115,10 +111,6 @@ func (s *store) open(raftln net.Listener) error {
 		if err := s.waitForLeader(0); err != nil {
 			return fmt.Errorf("raft: %s", err)
 		}
-
-		s.mu.Lock()
-		s.isReady = true
-		s.mu.Unlock()
 
 		// Already have a leader, now start to join cluster
 		n := &NodeInfo{
@@ -139,10 +131,6 @@ func (s *store) open(raftln net.Listener) error {
 		}
 	}
 
-	// raft Store is ready, so does the cluster
-	s.mu.Lock()
-	s.isReady = true
-	s.mu.Unlock()
 	return nil
 }
 
@@ -233,7 +221,7 @@ func (s *store) ready() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.isReady
+	return true
 }
 
 // reset will reset old raft store and set newly passed store as new raft stroe

@@ -114,8 +114,6 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 		}
 	}
 
-	// In 0.10.0 bind-address got moved to the top level. Check
-	// The old location to keep things backwards compatible
 	bind := c.Meta.BindAddress
 
 	s := &Server{

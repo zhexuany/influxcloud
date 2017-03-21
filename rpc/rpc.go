@@ -157,7 +157,7 @@ func (r *ExecuteStatementRequest) UnmarshalBinary(buf []byte) error {
 
 // ExecuteStatementResponse represents the response returned from a remote ExecuteStatementRequest call.
 type ExecuteStatementResponse struct {
-	pb internal.WriteShardResponse
+	b internal.WriteShardResponse
 }
 
 // Code returns the response code.

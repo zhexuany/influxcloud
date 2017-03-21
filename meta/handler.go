@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	// "net/http/pprof"
+	"net/http/pprof"
 	// "net/url"
 	"os"
 	"runtime"
@@ -18,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	// jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
 	"github.com/influxdata/influxdb/services/meta"
@@ -51,29 +50,6 @@ type handler struct {
 	leases  *meta.Leases
 }
 
-type Announcement struct {
-	timestamp time.Time
-}
-
-type Announcements []Announcement
-
-func (a Announcements) Filter() {
-
-}
-
-func (a *Announcement) validate() {
-}
-
-//
-func (a *Announcement) UnmarshalJSON(buf []byte) error {
-	return nil
-}
-
-//
-func (a Announcement) expired() bool {
-	return a.timestamp.Sub(now()) > time.Duration(0)
-}
-
 // newHandler returns a new instance of handler with routes.
 func newHandler(c *MetaConfig, s *Service) *handler {
 	// create a new handler based on MetaConfig
@@ -103,20 +79,12 @@ func (h *handler) WrapHandler(name string, hf http.HandlerFunc) http.Handler {
 	return handler
 }
 
-func verifyCreatingAdmin() {
-
-}
-
-func (h *handler) authorize() {
-
-}
-
 // ServeHTTP responds to HTTP request to the handler.
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// pprof.Cmdline(w, r)
-	// pprof.Profile(w, r)
-	// pprof.Symbol(w, r)
-	// pprof.Index(w, r)
+	pprof.Cmdline(w, r)
+	pprof.Profile(w, r)
+	pprof.Symbol(w, r)
+	pprof.Index(w, r)
 	switch r.Method {
 	case "GET":
 		switch r.URL.Path {
@@ -147,8 +115,6 @@ func (h *handler) do() {
 	// h.mu.RUnlock()
 	//http.Do
 	//time now
-	// jwt.NewWithClaims()
-	// jwt.SignedString()
 }
 
 func (h *handler) get() {
@@ -413,81 +379,6 @@ func (h *handler) serveRemoveShard(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *handler) serveCopyShardStatus(w http.ResponseWriter, r *http.Request) {
-
-}
-func (h *handler) serveCopyShard(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	// Read the command from the request body.
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Make sure it's a valid command.
-	if err := validateCommand(body); err != nil {
-		h.httpError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	// Apply the command to the store.
-	var resp *internal.Response
-	if err := h.store.apply(body); err != nil {
-		// If we aren't the leader, redirect client to the leader.
-		if err == raft.ErrNotLeader {
-			l := h.store.leaderHTTP()
-			if l == "" {
-				// No cluster leader. Client will have to try again later.
-				h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-				return
-			}
-			scheme := "http://"
-			if h.config.HTTPSEnabled {
-				scheme = "https://"
-			}
-
-			l = scheme + l + "/execute"
-			http.Redirect(w, r, l, http.StatusTemporaryRedirect)
-			return
-		}
-
-		// Error wasn't a leadership error so pass it back to client.
-		resp = &internal.Response{
-			OK:    proto.Bool(false),
-			Error: proto.String(err.Error()),
-		}
-	} else {
-		// Apply was successful. Return the new store index to the client.
-		resp = &internal.Response{
-			OK:    proto.Bool(false),
-			Index: proto.Uint64(h.store.index()),
-		}
-	}
-
-	// Marshal the response.
-	b, err := proto.Marshal(resp)
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Send response to client.
-	w.Header().Add("Content-Type", "application/octet-stream")
-	w.Write(b)
-}
-
-func (h *handler) serveKillCopyShard(w http.ResponseWriter, r *http.Request) {
-
-}
-func (h *handler) serveTruncateShards(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func validateCommand(b []byte) error {
 	// Ensure command can be deserialized before applying.
 	if err := proto.Unmarshal(b, &internal.Command{}); err != nil {
@@ -662,16 +553,6 @@ func (h *handler) serveLease(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (h *handler) serveAnnounce(w http.ResponseWriter, r *http.Request) {
-
-}
-func (h *handler) gossipAnnouncements() {
-
-}
-func (h *handler) mergeAnnouncements() {
-
-}
-
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
@@ -764,96 +645,6 @@ func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
 		h.logger.Println(err)
 	}
 	http.Error(w, "", status)
-}
-
-func (h *handler) serveGetUser(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func readUserAction() {
-
-}
-
-func (h *handler) servePostUser(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) createUser() {
-
-}
-func (h *handler) deleteUser() {
-
-}
-func (h *handler) changeUserPassword() {
-
-}
-func (h *handler) addUserPermissions() {
-
-}
-func (h *handler) removeUserPermissions() {
-
-}
-
-func (h *handler) serveGetRole(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) servePostRole(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) createRole() {
-
-}
-
-func (h *handler) deleteRole() {
-
-}
-
-func (h *handler) addRoleUsers() {
-
-}
-
-func (h *handler) removeRoleUsers() {
-
-}
-
-func (h *handler) addRolePermissions() {
-
-}
-
-func (h *handler) removeRolePermissions() {
-
-}
-
-func (h *handler) changeRolename() {
-
-}
-
-func (h *handler) serveAuthorized(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func parseCredentials() {
-
-}
-
-func (h *handler) jwtKeyLookup() {
-
-}
-
-func (h *handler) authenticate() {
-
-}
-
-type Permissions ScopedPermissions
-
-func (p Permissions) ScopedPermissions() {
-
-}
-
-func (p Permissions) FromScopedPermissions() {
-
 }
 
 func requiredParameters() {

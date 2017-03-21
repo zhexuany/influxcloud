@@ -14,17 +14,6 @@ import (
 type remoteIteratorCreator struct {
 	nodeDialer *NodeDialer
 
-	//
-
-	//
-
-	//
-
-	//
-	//
-
-	//
-
 	ids []uint64
 }
 

@@ -3,14 +3,12 @@ package meta
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/influxdata/influxdb/services/meta"
 	"github.com/zhexuany/influxdb-cluster/meta/internal"
-	"strconv"
 )
 
 //go:generate protoc --gogo_out=. internal/meta.proto
@@ -31,21 +29,15 @@ const (
 
 // Data represents the top level collection of all metadata.
 type Data struct {
-	*meta.Data
 	MetaNodes NodeInfos
 	DataNodes NodeInfos
 	Users     []UserInfo
-	Roles     RoleInfos
 	MaxNodeID uint64
 }
 
 // Clone returns a copy of data with a new version.
 func (data *Data) Clone() *Data {
 	other := *data
-
-	//copy data
-	other.Data = data.Data.Clone()
-
 	//copy meta nodes
 	if data.MetaNodes != nil {
 		other.MetaNodes = make([]NodeInfo, len(data.MetaNodes))
@@ -61,10 +53,6 @@ func (data *Data) Clone() *Data {
 			other.DataNodes[i] = data.DataNodes[i].clone()
 		}
 	}
-
-	//copy roles information
-	// other.Roles = data.CloneRoles()
-
 	//copy users information
 	other.Users = data.CloneUsers()
 
@@ -158,7 +146,6 @@ func (data *Data) CreateMetaNode(host, tcpHost string) error {
 }
 
 // SetMetaNode adds a meta node with a pre-specified nodeID.
-// this should only be used when the cluster is upgrading from 0.9 to 0.10
 func (data *Data) SetMetaNode(nodeID uint64, host, tcpHost string) error {
 	// Ensure a node with the same host doesn't already exist.
 	for _, n := range data.MetaNodes {
@@ -167,7 +154,6 @@ func (data *Data) SetMetaNode(nodeID uint64, host, tcpHost string) error {
 		}
 	}
 
-	//call CreateMetaNode
 	// Append new node.
 	pendingShardOwners := make(uint64arr, 0)
 	data.MetaNodes = append(data.MetaNodes, NodeInfo{
@@ -365,11 +351,7 @@ func (data *Data) marshal() *internal.ClusterData {
 	}
 
 	pb.Users = make([]*internal.UserInfo, len(data.Users))
-	// for i := range data.Users {
-	// pb.Users[i] = data.Users[i].marshal()
-	// }
 
-	//RoleInfo marshal TODO
 	return pb
 }
 
@@ -392,17 +374,6 @@ func (data *Data) unmarshal(pb *internal.ClusterData) {
 	for i, meta := range pb.GetMetaNodes() {
 		data.MetaNodes[i].unmarshal(meta)
 	}
-
-	// data.DataNodes = make([]NodeInfo, len(pb.GetDataNodes()))
-	// for i, data := range pb.GetDataNodes() {
-	// 	data.DataNodes[i].unmarshal(data)
-	// }
-
-	// //RoleInfo TODO unmarshal
-	// data.Users = make([]UserInfo, len(pb.GetUsers()))
-	// for i, x := range pb.GetUsers() {
-	// 	data.Users[i].unmarshal(x)
-	// }
 }
 
 // CreateShardGroup creates a shard group on a database and policy for a given timestamp.
@@ -696,84 +667,6 @@ func (data *Data) AddUserPermissions() error {
 	return nil
 }
 
-func (data *Data) RemoveUserPermissions() error {
-	return nil
-}
-
-func (data *Data) UserPermissions() *ScopedPermissions {
-	return nil
-}
-
-// UserPrivilege gets the privilege for a user on a database.
-func (data *Data) UserPrivilege(name, database string) (*influxql.Privilege, error) {
-	// ui := data.User(name)
-	// if ui == nil {
-	// 	return nil, ErrUserNotFound
-	// }
-
-	// for db, p := range ui.Privileges {
-	// 	if db == database {
-	// 		return &p, nil
-	// 	}
-	// }
-
-	// return influxql.NewPrivilege(influxql.NoPrivileges), nil
-	return nil, nil
-}
-
-// UserPrivileges gets the privileges for a user.
-func (data *Data) UserPrivileges(name string) (map[string]influxql.Privilege, error) {
-	// ui := data.User(name)
-	// if ui == nil {
-	// return nil, ErrUserNotFound
-	// }
-
-	// return ui.Privileges, nil
-	return nil, nil
-}
-
-func (data *Data) OSSUser() {
-	// users := data.Users
-	// for _, usr := range users {
-	// data.UserPermissions(usr)
-	//meta.AddAdminPermissions
-	// data.Authorized()
-	// }
-}
-
-func (data *Data) OSSAdminExists() {
-	// data.Authorized()
-}
-
-func (data *Data) CloneRoles() []RoleInfo {
-	return nil
-}
-
-func (data *Data) CloneUsers() []UserInfo {
-	if data.Users == nil {
-		return nil
-	}
-
-	usr := make([]UserInfo, len(data.Users))
-	// for i := range data.Users {
-	// usr[i] = data.Users[i].
-	// }
-
-	return usr
-}
-
-func (data *Data) Authorized(userName string) {
-	// usr := data.User(userName)
-	//iter a map
-	// permission := data.hasPermissions(usr)
-}
-
-func (data *Data) hasPermissions(usr UserInfo) bool {
-	//ScopedPermissions.Contains(usr)
-	//RoleInfo.Authorized
-	return false
-}
-
 //TODO finish this until we have a demo to run
 func (data *Data) ImportData(buf []byte) error {
 	// other := Data{}
@@ -800,90 +693,6 @@ func (data *Data) ImportData(buf []byte) error {
 	return nil
 }
 
-//TODO(zhexuany)Leave all permission, UserInfo and RoleInfo closed
-type Permission struct {
-	num int64
-}
-
-func (p Permission) MarshalText() []byte {
-	return []byte(p.String())
-}
-
-func (p *Permission) Unmarshaltext(buf []byte) error {
-	p.num = ParsePermission(string(buf))
-	return nil
-}
-
-func (p *Permission) UnmarshalJSON(buf []byte) error {
-	txt := string(buf)
-	if txt, err := strconv.Unquote(txt); err != nil {
-		return p.Unmarshaltext([]byte(txt))
-	}
-	num, err := strconv.ParseInt(txt, 10, 64)
-	if err != nil {
-		return fmt.Errorf("failed to parse int: %v", err)
-	}
-	p.num = num
-	return nil
-}
-func (p Permission) String() string {
-	return ""
-}
-
-func ParsePermission(txt string) int64 {
-	return 0
-}
-
-func ParsePrivilege() {}
-
-type PermissionsSet struct {
-}
-
-func (ps PermissionsSet) Len() int {
-	return 0
-}
-
-func (ps PermissionsSet) Swap(i, j int) {}
-
-func (ps PermissionsSet) Less(i, j int) {}
-
-func (ps *PermissionsSet) Clone()  {}
-func (ps *PermissionsSet) Add()    {}
-func (ps *PermissionsSet) Delete() {}
-
-func (ps *PermissionsSet) Contains() {}
-
-type ScopedPermissions struct {
-}
-
-func (scp *ScopedPermissions) unmarshal(buf []byte) error {
-	return nil
-}
-
-func (scp *ScopedPermissions) Clone() *ScopedPermissions {
-	return nil
-}
-
-func (scp *ScopedPermissions) Add() error {
-	return nil
-}
-
-func (scp *ScopedPermissions) Delete() error {
-	return nil
-}
-
-func (scp *ScopedPermissions) Contains() bool {
-	return false
-}
-
-func (scp *ScopedPermissions) Matches() bool {
-	return false
-}
-
-func AddAdminPermissions() {
-
-}
-
 //TODO (zhexuany) do not worry about this until alpha version
 type UserInfo struct {
 	meta.UserInfo
@@ -894,75 +703,6 @@ func (u *UserInfo) unmarshal(pb internal.UserInfo) error {
 	// return u.Privileges.unmarshal()
 	return nil
 }
-
-func (u *UserInfo) InfluxDBUser() *UserInfo {
-	return nil
-}
-
-type RoleInfo struct {
-	Users       []string
-	Permissions ScopedPermissions
-}
-
-func (r *RoleInfo) HasUser(user UserInfo) bool {
-	i := sort.Search(len(r.Users), func(i int) bool { return r.Users[i] == user.Name })
-	return i < len(r.Users) && r.Users[i] == user.Name
-}
-
-func (r *RoleInfo) AddUsers(users []UserInfo) {
-	for _, usr := range users {
-		if !r.HasUser(usr) {
-			r.Users = append(r.Users, usr.Name)
-		}
-	}
-}
-
-func (r *RoleInfo) RemoveUsers(users []UserInfo) {
-	Users := r.Users
-	for _, usr := range users {
-		for i, u := range Users {
-			if usr.Name == u {
-				r.Users = r.Users[:i+copy(r.Users[i:], r.Users[i+1:])]
-			}
-		}
-	}
-
-	sort.Strings(r.Users)
-}
-
-func (r *RoleInfo) Authorized(user UserInfo) {
-	if !r.HasUser(user) {
-		return
-	}
-}
-
-func (r RoleInfo) clone() *RoleInfo {
-	return nil
-}
-
-func (r RoleInfo) marshal() {
-
-}
-
-func (r *RoleInfo) unmarshal() {
-
-}
-
-type RoleInfos []RoleInfo
-
-func (rs RoleInfos) Len() int {
-	return len(rs)
-}
-
-func (rs RoleInfos) Swap(i, j int) {
-	rs[i], rs[j] = rs[j], rs[i]
-}
-
-func (rs RoleInfos) Less(i, j int) bool {
-	return len(rs[i].Users) < len(rs[j].Users)
-}
-
-func (rs RoleInfos) Authorized() {}
 
 type uint64arr []uint64
 

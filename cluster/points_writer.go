@@ -125,31 +125,6 @@ func NewShardMapping() *ShardMapping {
 	}
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-//
-
-//
-//
-
-//
-
-//
 // MapPoint maps a point to shard
 func (s *ShardMapping) MapPoint(shardInfo *meta.ShardInfo, p models.Point) {
 	points, ok := s.Points[shardInfo.ID]

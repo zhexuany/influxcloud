@@ -14,11 +14,11 @@ type Tracker struct {
 func (t *Tracker) Add(task string) {
 }
 
-func (t *Tracker) Remove() {
+func (t *Tracker) Remove(task string) {
 
 }
 
-func (t *Tracker) Tasks() {
+func (t *Tracker) Tasks() []string {
 
 }
 
@@ -33,17 +33,10 @@ func (t *Tracker) id(id uint64) {
 	strconv.FormatUint(id, 64)
 }
 
-//TODO revist this later
 type tasks []uint64
 
-func (t tasks) Len() int {
-	return len(t)
-}
+func (t tasks) Len() int { return len(t) }
 
-func (t tasks) Swap(i, j int) {
-	t[i], t[j] = t[j], t[i]
-}
+func (t tasks) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 
-func (t tasks) Less(i, j int) bool {
-	return t[i] < t[j]
-}
+func (t tasks) Less(i, j int) bool { return t[i] < t[j] }

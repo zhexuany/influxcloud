@@ -21,22 +21,6 @@ const MaxMessageSize = 1024 * 1024 * 1024 // 1GB
 // MuxHeader is the header byte used in the TCP mux.
 const MuxHeader = 2
 
-// Statistics maintained by the cluster package
-const (
-	writeShardReq       = "writeShardReq"
-	writeShardPointsReq = "writeShardPointsReq"
-	writeShardFail      = "writeShardFail"
-
-	createIteratorReq  = "createIteratorReq"
-	createIteratorResp = "createIteratorResp"
-
-	fieldDimensionsReq  = "fieldDimensionsReq"
-	fieldDimensionsResp = "fieldDimensionsResp"
-
-	seriesKeysReq  = "seriesKeysReq"
-	seriesKeysResp = "seriesKeysResp"
-)
-
 type Service struct {
 	mu sync.RWMutex
 
@@ -60,7 +44,6 @@ func NewService(c Config) *Service {
 	return &Service{
 		closing: make(chan struct{}),
 		Logger:  log.New(os.Stderr, "[cluster] ", log.LstdFlags),
-		statMap: influxdb.NewStatistics("cluster", "cluster", nil),
 	}
 }
 
@@ -120,10 +103,6 @@ func (s *Service) Close() error {
 	return nil
 }
 
-func (s *Service) Statistics() {
-
-}
-
 func (s *Service) handleConn(conn net.Conn) {
 	//Ensuring connection is closed when service is closed
 	closing := make(chan struct{})
@@ -160,7 +139,6 @@ func (s *Service) handleConn(conn net.Conn) {
 				return
 			}
 
-			s.statMap.Add(writeShardReq, 1)
 			err = s.processWriteShardRequest(buf)
 			if err != nil {
 				s.Logger.Printf("process write shard error: %s", err)
@@ -179,15 +157,12 @@ func (s *Service) handleConn(conn net.Conn) {
 			}
 			s.writeShardResponse(conn, err)
 		case tlv.CreateIteratorRequestMessage:
-			s.statMap.Add(createIteratorReq, 1)
 			s.processCreateIteratorRequest(conn)
 			return
 		case tlv.FieldDimensionsRequestMessage:
-			s.statMap.Add(fieldDimensionsReq, 1)
 			s.processFieldDimensionsRequest(conn)
 			return
 		// case seriesKeysRequestMessage:
-		// s.statMap.Add(seriesKeysReq, 1)
 		// s.processSeriesKeysRequest(conn)
 		// return
 		default:
@@ -219,7 +194,6 @@ func (s *Service) processWriteShardRequest(buf []byte) error {
 	}
 
 	points := req.Points()
-	s.statMap.Add(writeShardPointsReq, int64(len(points)))
 	err := s.TSDBStore.WriteToShard(req.ShardID(), points)
 
 	// We may have received a write for a shard that we don't have locally because the
@@ -236,19 +210,16 @@ func (s *Service) processWriteShardRequest(buf []byte) error {
 
 		err = s.TSDBStore.CreateShard(req.Database(), req.RetentionPolicy(), req.ShardID())
 		if err != nil {
-			s.statMap.Add(writeShardFail, 1)
 			return fmt.Errorf("create shard %d: %s", req.ShardID(), err)
 		}
 
 		err = s.TSDBStore.WriteToShard(req.ShardID(), points)
 		if err != nil {
-			s.statMap.Add(writeShardFail, 1)
 			return fmt.Errorf("write shard %d: %s", req.ShardID(), err)
 		}
 	}
 
 	if err != nil {
-		s.statMap.Add(writeShardFail, 1)
 		return fmt.Errorf("write shard %d: %s", req.ShardID(), err)
 	}
 
@@ -419,12 +390,7 @@ func (s *Service) processExpandSourcesRequest() {
 func (s *Service) processDownloadShardSnapshotRequest() {
 
 }
-func (s *Service) processCopyShardRequest() {
 
-}
-func (s *Service) processRemoveShardRequest() {
-
-}
 func (s *Service) shardSnapshot() {
 
 }
@@ -435,12 +401,6 @@ func (s *Service) downloadShardSnapshot() {
 
 }
 func (s *Service) processShardStatusRequest() {
-
-}
-func (s *Service) processCopyShardStatusRequest() {
-
-}
-func (s *Service) processKillCopyShardRequest() {
 
 }
 func (s *Service) processShowQueriesRequest() {
