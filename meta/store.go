@@ -51,21 +51,12 @@ type store struct {
 	isReady     bool
 	logger      *log.Logger
 
-	raftAddr        string
-	httpAddr        string
-	copyShardStatus map[string]int64
+	raftAddr string
+	httpAddr string
 
 	node *influxdb.Node
 
 	raftLn net.Listener
-	//
-	//
-	//
-	//
-	//
-	//
-	//
-	//
 }
 
 // newStore will create a new metastore with the passed in config
@@ -273,10 +264,6 @@ func (s *store) reset(st *store) error {
 		// return nil
 	}
 
-	//new object
-	//
-	//make ma
-	//
 	return nil
 }
 
@@ -674,26 +661,6 @@ func (s *store) updateDataNode(id uint64, host, tcpHost string) error {
 }
 
 //
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
 func (s *store) nodeByHTTPAddr(addr string) (*NodeInfo, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -705,225 +672,3 @@ func (s *store) nodeByHTTPAddr(addr string) (*NodeInfo, error) {
 
 	return nil, ErrNodeNotFound
 }
-
-// copyShard copies shard with shardID from src to dst
-func (s *store) copyShard(src, dst string, shardID uint64) error {
-	if !s.ready() {
-		return ErrServiceUnavailable
-	}
-
-	// retrieve shard's location according to its shardID
-	s.mu.RLock()
-	si, err := s.data.ShardLocation(shardID)
-	s.mu.RUnlock()
-	if err != nil {
-		return err
-	}
-
-	//locate source node
-	srcNode := s.dataNodeByTCPHost(src)
-	if srcNode == nil {
-		return fmt.Errorf("failed to locate node's info: %s", srcNode.TCPHost)
-	}
-
-	//if shard is not owned by src node, then return error
-	if !si.OwnedBy(srcNode.ID) {
-		return fmt.Errorf("shard %d is not owned by %s", shardID, src)
-	}
-
-	// locate destination node
-	dstNode := s.dataNodeByTCPHost(dst)
-	if dstNode != nil {
-		return fmt.Errorf("failed to locate node's info: %s", srcNode.TCPHost)
-	}
-
-	val := &internal.AddPendingShardOwnerCommand{
-		ID:     proto.Uint64(si.ID),
-		NodeID: proto.Uint64(dstNode.ID),
-	}
-
-	t := internal.Command_AddPendingShardOwnerCommand
-	cmd := &internal.Command{Type: &t}
-	if err := proto.SetExtension(cmd, internal.E_AddPendingShardOwnerCommand_Command, val); err != nil {
-		panic(err)
-	}
-
-	b, err := proto.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	//update index
-	s.mu.RLock()
-	s.data.Data.Index += 1 //TODO check index is updated here or not
-	s.mu.RUnlock()
-	if err := s.apply(b); err != nil {
-		return err
-	}
-
-	// Open connection for checking shard already copied to dst node
-	conn, err := net.Dial("tcp", dstNode.TCPHost)
-	if err != nil {
-		return fmt.Errorf("failed to Dial: %v", err)
-	}
-	defer conn.Close()
-
-	//
-	//
-	r := &rpc.CopyShardRequest{
-		ShardID: shardID,
-		Source:  src,
-		Dest:    dst,
-	}
-	if r == nil {
-		return fmt.Errorf("failed to created CopyShard")
-	}
-
-	if err := tlv.EncodeTLV(conn, tlv.CopyShardRequestMessage, r); err != nil {
-		return fmt.Errorf("failed to encode tlv: %v", err)
-	}
-	v := rpc.CopyShardResponse{}
-	if _, err := tlv.DecodeTLV(conn, &v); err != nil {
-		return fmt.Errorf("failed to decode tlv: %v", err)
-	}
-
-	return nil
-}
-
-// removeShard will remove a shard associated with shardID in dst node
-func (s *store) removeShard(src string, shardID uint64) error {
-	if !s.ready() {
-		return ErrServiceUnavailable
-	}
-
-	// locate source node's info
-	srcNode := s.dataNodeByTCPHost(src)
-	if srcNode == nil {
-		return fmt.Errorf("failed to locate destination node: %s", src)
-	}
-
-	// Dial tcpHost to build connection
-	// Which can be used to perform a rpc call
-	conn, err := net.Dial("tcp", srcNode.TCPHost)
-	if err != nil {
-		return fmt.Errorf("remove shard: failed to Dial %v", err)
-	}
-	defer conn.Close()
-
-	// located the shard
-	s.mu.RLock()
-	si, err := s.data.ShardLocation(shardID)
-	s.mu.RUnlock()
-	if err != nil {
-		return err
-	}
-
-	if !si.OwnedBy(srcNode.ID) {
-		return fmt.Errorf("Can remove Shard %d  since %s does not own it", shardID, srcNode.Host)
-	}
-	r := &rpc.RemoveShardRequest{
-		ShardID: shardID,
-	}
-	//
-	if r == nil {
-		return fmt.Errorf("failed to created RemoveShardRequest")
-	}
-	var typ byte
-	if err := tlv.EncodeTLV(conn, tlv.RemoveShardRequestMessage, r); err != nil {
-		return fmt.Errorf("failed to encode:%v", err)
-	}
-	v := &rpc.RemoveShardResponse{}
-	if typ, err = tlv.DecodeTLV(conn, v); err != nil {
-		return fmt.Errorf("failed to decode:%v", err)
-	}
-
-	if typ == tlv.RemoveShardResponseMessage {
-		return errors.New("Wrong Response Message")
-	}
-
-	// Drop ShardCommand in all data nodes
-	val := &internal.DropShardCommand{
-		ID: proto.Uint64(shardID),
-	}
-
-	t := internal.Command_DropShardCommand
-	cmd := &internal.Command{Type: &t}
-	if err := proto.SetExtension(cmd, internal.E_DropShardCommand_Command, val); err != nil {
-		panic(err)
-	}
-
-	b, err := proto.Marshal(cmd)
-	if err != nil {
-		return err
-	}
-
-	//
-	s.mu.RLock()
-	//
-	s.mu.RUnlock()
-	return s.apply(b)
-}
-
-func (s *store) killCopyShard(dst string, id uint64) error {
-	if s.ready() {
-		return ErrServiceUnavailable
-	}
-
-	ni := s.dataNodeByTCPHost(dst)
-	if ni != nil {
-		return nil
-	}
-
-	return nil
-}
-
-// remoteNodeError.Error() {
-
-// func (s *store) executeCopyShardStatus() error {
-// }
-// func (s *store) copyShardStatus() error {
-// }
-// func (s *store) user() error {
-// }
-// func (s *store) users() error {
-// }
-// func (s *store) adminExists() error {
-// }
-// func (s *store) createUser() error {
-// }
-// func (s *store) deleteUser() error {
-// }
-// func (s *store) setUserPassword() error {
-// }
-// func (s *store) addUserPermissions() error {
-// }
-// func (s *store) removeUserPermissions() error {
-// }
-// func (s *store) role() error {
-// }
-// func (s *store) roles() error {
-// }
-// func (s *store) createRole() error {
-// }
-// func (s *store) deleteRole() {
-// }
-// func (s *store) addRoleUsers() error {
-// }
-// func (s *store) removeRoleUsers() error {
-// }
-// func (s *store) addRolePermissions() error {
-// }
-// func (s *store) removeRolePermissions() error {
-// }
-// func (s *store) changeRoleName() error {
-// }
-// func (s *store) truncateShardGroups() error {
-// }
-// func (s *store) authenticate() error {
-// }
-// func (s *store) authorized() error {
-// }
-// func (s *store) authorizedScoped() error {
-// }
-// func (s *store) updateRetentionPolicy() error {
-// }
