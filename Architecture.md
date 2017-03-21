@@ -44,19 +44,15 @@ is
 ~~~
 points ----> any node in cluster -----> find nodes  -> buffer write in hinted handoff
 ~~~
-                                         
-When points arrives `influxDB` either in tcp or udp, it can handle this on its own. We do not need worry about this.
 
-#### The rule about merge points
-Speaking about the merge rules, we need bring `Shards Groups` into.
-##### Shards Groups
-All data stored in cluster as a form of `Shards`.  Consering the replication factor is `x` and there is
-`n` node available in cluster. If we assume there are `m` shrads has to be written into cluster, then for every node, `nm/x` shards
-will be written into cluster. 
+The key is about how to determine the destination of these point.  It is related with `Shards Groups`. 
+#### Shards Groups
+All data stored in cluster as a form of `Shards`.  Consering the replication factor is `x` and there is `n` node available in cluster. Then `n/x` shards will be created in 
+each group, discarding any fractions. 
 
-When a write comes in with values that have a timestamp, we first determine which `ShardGroup` that this write goes to. After this, 
-we take the concatatention of `measurement` and `tagset` as out key and hash such key for bucketing into the correct shard. In Go, it will
-be the following.
+This means that a new shard group will be created for each dat of data that gets written in. Within shard group 2 shards will be created. Because of the replication factor of 2, 
+each of those two shards will be copied on 2 servers.
+When a write comes in with values that have a timestamp, we first determine which `ShardGroup` that this write goes to. After this, we take the concatatention of `measurement` and `tagset` as out key and hash such key for bucketing into the correct shard. In Go, it will be the following.
 
 ~~~go
 // key is measurement + tagset
@@ -65,18 +61,18 @@ be the following.
 shard := shardGroup.shards[fnv.New64a(key) % len(shardGroup.Shards)]
 ~~~
 
-There are multiple implications to this scheme for determining where data lives in a cluster. 
-First, for any given metaseries all data on any given day will exist in a single shard, and 
-thus only on those servers hosting a copy of that shard. Second, once a shard group is created, 
-adding new servers to the cluster won’t scale out write capacity for that shard group. 
+There are multiple implications to this scheme for determining where data lives in a cluster. First, for any given metaseries all data on any given day will exist in a single shard, and thus only on those servers hosting a copy of that shard. Second, once a shard group is created, adding new servers to the cluster won’t scale out write capacity for that shard group. But we will figure a way to expand the writes in cluster in future.
 
 When a batch points arrives, we apply the rule we just described above to find the correct `shard`  and write data into disk.
+
+When points arrives `influxDB` either in tcp or udp, it can handle this on its own. We do not need worry about this.
 
 ### How query work in this cluster?
 
 ~~~
-query ----> any node in cluster ----->analyse query --------> find nodes  -> wait until all distributed query come back -> send all data back to client 
+query ----> any node in cluster -----> analyse query --------> find nodes  -> wait until all distributed query come back -> send all data back to client 
 ~~~
+
 Query in a cluster are distributed based on time range being queried and the replication factor of the data. For example if the retention policy has a replication factor of 4, the coordinating data node receiving the query randomly picks any of the 4 data nodes that store a replica of the shard(s) to receive the query. If we assume that 
 the system has shard durations of one day, then for each day of time covered by a query the coordinating node will select one data node to receive the query for that day. The coordinating node will execute and fulfill the query locally whenever possible. If a query must scan multiple shard groups (multiple days in our example above), the node will will forward queries to other nodes for shard(s) it does not have locally. The queries are forwarded in parallel to scanning its own local data. The queries are distributed to as many nodes as required to query each shard group once. As the results come back from each data node, the node combines them into the final result that gets returned to the user.
 
