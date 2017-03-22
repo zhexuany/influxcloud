@@ -105,7 +105,6 @@ func (c *Client) Open() error {
 	c.changed = make(chan struct{})
 	c.mu.Unlock()
 	// c.closing = make(chan struct{})
-	//133
 	c.cacheData = c.retryUntilSnapshot(0)
 	if c.cacheData == nil {
 		return fmt.Errorf("failed to snapshot %v", c.cacheData)
@@ -230,7 +229,7 @@ func (c *Client) SetPath(path string) {
 
 func (c *Client) TLS() bool {
 	c.mu.RLock()
-	c.mu.RUnlock()
+	defer c.mu.RUnlock()
 	return c.tls
 }
 

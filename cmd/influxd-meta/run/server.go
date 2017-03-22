@@ -181,10 +181,11 @@ func (s *Server) Open() error {
 }
 
 func (s *Server) initializeMetaClient() {
-	s.MetaClient.SetMetaServers(nil)
+	metaServers := []string(s.config.Meta.RemoteHostname)
+	s.MetaClient.SetMetaServers(metaServers)
 	s.MetaClient.SetTLS(s.config.Meta.HTTPSEnabled)
 	if s.MetaClient.HTTPClient != nil {
-		s.MetaClient.SetHTTPClient(nil)
+		s.MetaClient.SetHTTPClient(&http.Client{})
 	}
 	s.MetaClient.SetAuthInfo(s.config.Meta.RemoteHostname)
 	s.MetaClient.Open()
@@ -206,22 +207,6 @@ func (s *Server) Close() error {
 
 	close(s.closing)
 	return nil
-}
-
-// startServerReporting starts periodic server reporting.
-func (s *Server) startServerReporting() {
-	s.reportServer()
-
-	ticker := time.NewTicker(24 * time.Hour)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-s.closing:
-			return
-		case <-ticker.C:
-			s.reportServer()
-		}
-	}
 }
 
 // monitorErrorChan reads an error channel and resends it through the server.
@@ -277,7 +262,6 @@ func startProfile(cpuprofile, memprofile string) {
 		prof.mem = f
 		runtime.MemProfileRate = 4096
 	}
-
 }
 
 // StopProfile closes the cpu and memory profiles if they are running.
