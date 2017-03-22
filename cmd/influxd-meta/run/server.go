@@ -165,18 +165,15 @@ func (s *Server) Open() error {
 	s.initializeMetaClient()
 	// Multiplex listener.
 	mux := tcp.NewMux()
-	// go mux.Listen(byte())
 	go mux.Serve(ln)
 	if err := s.MetaClient.Open(); err != nil {
 		return err
 	}
 
-	s.HTTPAddr()
 	if err := s.Service.Open(); err != nil {
 		return err
 	}
 
-	s.Service.Err()
 	return nil
 }
 
