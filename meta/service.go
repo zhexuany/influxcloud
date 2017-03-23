@@ -76,7 +76,7 @@ func (s *Service) Version() string {
 
 // Open starts the service
 func (s *Service) Open() error {
-	s.Logger.Println("Starting meta service")
+	s.Logger.Println("Starting meta service at ", s.HTTPAddr())
 
 	if s.RaftListener == nil {
 		panic("no raft listener set")

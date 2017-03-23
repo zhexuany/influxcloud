@@ -104,7 +104,6 @@ func (c *Client) Open() error {
 	c.mu.Lock()
 	c.changed = make(chan struct{})
 	c.mu.Unlock()
-	// c.closing = make(chan struct{})
 	c.cacheData = c.retryUntilSnapshot(0)
 	if c.cacheData == nil {
 		return fmt.Errorf("failed to snapshot %v", c.cacheData)
@@ -152,23 +151,8 @@ func (c *Client) closed() bool {
 	}
 }
 
+//TODO zhexuany revisit this later after the realse of our prototype
 func (c *Client) doHTTP(path string, method string, reader io.Reader) (resp *http.Response, err error) {
-	// if c.TLS() {
-	// 	// method = "https"
-	// }
-	// req, err := http.NewRequest(method, url.URL.String(), nil)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// // set header
-	// req.Header.Set("", "")
-	// c.mu.RLock()
-	// c.mu.RUnlock()
-	// resp, err = http.Client.Do(req)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return nil, nil
 }
 
@@ -1226,7 +1210,12 @@ func (c *Client) pollForUpdates() {
 }
 
 func (c *Client) getSnapshot(server string, index uint64) (*Data, error) {
-	resp, err := c.get(server + fmt.Sprintf("?index=%d", index))
+	if server == "" {
+		return nil, errors.New("server host empty")
+	}
+	// resp, err := c.get(server + fmt.Sprintf("?index=%d", index))
+	resp, err := http.Get(server + fmt.Sprintf("?index=%d", index))
+
 	if err != nil {
 		return nil, err
 	}
