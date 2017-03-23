@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/tcp"
+	influxdb_cluster "github.com/zhexuany/influxdb-cluster"
 	"github.com/zhexuany/influxdb-cluster/meta"
 )
 
@@ -83,35 +83,27 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 		return nil, fmt.Errorf("mkdir all: %s", err)
 	}
 
-	// 0.10-rc1 and prior would sometimes put the node.json at the root
-	// dir which breaks backup/restore and restarting nodes.  This moves
-	// the file from the root so it's always under the meta dir.
-	oldPath := filepath.Join(filepath.Dir(c.Meta.Dir), "node.json")
-	newPath := filepath.Join(c.Meta.Dir, "node.json")
+	path := filepath.Join(c.Meta.Dir, "node.json")
 
-	//check oldpath is existed or not, if yes rename oldpath with newpath
-	if _, err := os.Stat(oldPath); err == nil {
-		if err := os.Rename(oldPath, newPath); err != nil {
-			return nil, err
+	// check file is existed or not
+	if _, err := os.Stat(path); err == nil {
+		// load node from node.json and check the error
+		node, err := influxdb_cluster.LoadNode(c.Meta.Dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, err
+			}
 		}
-	}
 
-	// load node from node.json and check the error
-	node, err := influxdb.LoadNode(c.Meta.Dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, err
-		}
-	}
-
-	//LoadNode will just pasrse node.json file and create a instance
-	//node. So, node.json wiill not be changed util we trigger from program
-	//Hence, we have to check path in original node.json include the newPath
-	//instead of oldPath. If not, we have to save such node instance to
-	//node.json file
-	if buf, err := ioutil.ReadFile(filepath.Join(newPath)); err != nil {
-		if !strings.Contains(string(buf), "path") {
-			node.Save()
+		//LoadNode will just pasrse node.json file and create a instance
+		//node. So, node.json wiill not be changed util we trigger from program
+		//Hence, we have to check path in original node.json include the newPath
+		//instead of oldPath. If not, we have to save such node instance to
+		//node.json file
+		if buf, err := ioutil.ReadFile(filepath.Join(path)); err != nil {
+			if !strings.Contains(string(buf), "path") {
+				node.Save()
+			}
 		}
 	}
 
@@ -162,11 +154,21 @@ func (s *Server) Open() error {
 	}
 	s.Listener = ln
 
-	//initializes metaClient
-	s.initializeMetaClient()
 	// Multiplex listener.
 	mux := tcp.NewMux()
 	go mux.Serve(ln)
+
+	if s.Service != nil {
+		s.Service.RaftListener = mux.Listen(meta.MuxHeader)
+		// Open meta service.
+		if err := s.Service.Open(); err != nil {
+			return fmt.Errorf("open meta service: %s", err)
+		}
+	}
+
+	//initializes metaClient
+	s.initializeMetaClient()
+
 	if err := s.MetaClient.Open(); err != nil {
 		return err
 	}

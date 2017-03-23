@@ -92,7 +92,7 @@ func (cmd *Command) Run(args ...string) error {
 
 	// Validate the configuration.
 	if err := config.Validate(); err != nil {
-		return fmt.Errorf("%s. To generate a valid configuration file run `influxd config > influxdb.generated.conf`", err)
+		return fmt.Errorf("%s. To generate a valid configuration file run `influxd-meta config > influxdb-meta.generated.conf`", err)
 	}
 
 	// Create server from config and start it.
@@ -101,10 +101,12 @@ func (cmd *Command) Run(args ...string) error {
 		Commit:  cmd.Commit,
 		Branch:  cmd.Branch,
 	}
+
 	s, err := NewServer(config, buildInfo)
 	if err != nil {
 		return fmt.Errorf("create server: %s", err)
 	}
+
 	s.CPUProfile = options.CPUProfile
 	s.MemProfile = options.MemProfile
 	if err := s.Open(); err != nil {
