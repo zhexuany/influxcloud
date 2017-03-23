@@ -35,6 +35,7 @@ type Data struct {
 	MetaNodes NodeInfos
 	DataNodes NodeInfos
 	MaxNodeID uint64
+	ClusterID uint64
 }
 
 // Clone returns a copy of data with a new version.

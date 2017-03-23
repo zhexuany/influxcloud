@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -125,7 +126,7 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 
 		Logger: log.New(os.Stderr, "", log.LstdFlags),
 
-		MetaClient: meta.NewClient(),
+		MetaClient: meta.NewClient(c.Meta),
 
 		Service: meta.NewService(c.Meta),
 
@@ -178,13 +179,12 @@ func (s *Server) Open() error {
 }
 
 func (s *Server) initializeMetaClient() {
-	metaServers := []string(s.config.Meta.RemoteHostname)
+	metaServers := []string{s.config.Meta.RemoteHostname}
 	s.MetaClient.SetMetaServers(metaServers)
 	s.MetaClient.SetTLS(s.config.Meta.HTTPSEnabled)
 	if s.MetaClient.HTTPClient != nil {
 		s.MetaClient.SetHTTPClient(&http.Client{})
 	}
-	s.MetaClient.SetAuthInfo(s.config.Meta.RemoteHostname)
 	s.MetaClient.Open()
 	s.MetaClient.WaitForDataChanged()
 }
