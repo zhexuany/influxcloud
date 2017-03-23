@@ -105,9 +105,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/execute":
 			h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
-		case "/add/data":
+		case "/add-data":
 			h.WrapHandler("add-data", h.serveAddData).ServeHTTP(w, r)
-		case "/add/meta":
+		case "/add-meta":
 			h.WrapHandler("add-meta", h.serveAddMeta).ServeHTTP(w, r)
 
 		}
@@ -231,7 +231,7 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 
 	err := h.store.createDataNode(addr, raftAddr)
 	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/add/data")
+		h.redirectLeader(w, r, "/add-data")
 		return
 	}
 
@@ -301,7 +301,7 @@ func (h *handler) serveAddMeta(w http.ResponseWriter, r *http.Request) {
 
 	err := h.store.createMetaNode(addr, raftAddr)
 	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/add/meta")
+		h.redirectLeader(w, r, "/add-meta")
 		return
 	}
 
