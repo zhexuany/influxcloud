@@ -2,11 +2,8 @@ package influxdb_cluster
 
 import (
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 const (
