@@ -77,12 +77,10 @@ func NewConfig() *Config {
 
 func NewDemoConfig() *Config {
 	c := NewConfig()
-	// c.InitTableAttrs()
 
 	var homeDir string
 	// By default, store meta and data files in current users home directory
 	u, err := user.Current()
-	c.Meta.Dir = filepath.Join(homeDir, ".influxdb/meta")
 	if err == nil {
 		homeDir = u.HomeDir
 	} else if os.Getenv("HOME") != "" {
@@ -91,16 +89,9 @@ func NewDemoConfig() *Config {
 		return nil
 	}
 
-	// The following lines should add to data node instead of meta node TODO
-	// c.Data.Dir = filepath.Join(homeDir, ".influxdb/data")
-	// c.HintedHandoff.Dir = filepath.Join(homeDir, ".influxdb/hh")
-	// c.Data.WALDir = filepath.Join(homeDir, ".influxdb/wal")
-	// c.HintedHandoff.Enabled = true
-	// c.Meta.
-	// c.Admin.Enabled = true
+	c.Meta.Dir = filepath.Join(homeDir, ".influxdb/meta")
 
 	return c
-
 }
 
 func (c *Config) Validate() error {
