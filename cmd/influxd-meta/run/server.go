@@ -164,16 +164,14 @@ func (s *Server) Open() error {
 		if err := s.Service.Open(); err != nil {
 			return fmt.Errorf("open meta service: %s", err)
 		}
+
+		go s.monitorErrorChan(s.Service.Err())
 	}
 
 	//initializes metaClient
 	s.initializeMetaClient()
 
 	if err := s.MetaClient.Open(); err != nil {
-		return err
-	}
-
-	if err := s.Service.Open(); err != nil {
 		return err
 	}
 
