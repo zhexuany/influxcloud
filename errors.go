@@ -1,4 +1,4 @@
-package influxdb
+package influxdb_cluster
 
 import (
 	"errors"
