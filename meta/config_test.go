@@ -5,12 +5,13 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/influxdata/influxdb/services/meta"
+
+	"github.com/zhexuany/influxdb-cluster/meta"
 )
 
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
-	var c meta.Config
+	var c meta.MetaConfig
 	if _, err := toml.Decode(`
 enabled = false
 dir = "/tmp/foo"

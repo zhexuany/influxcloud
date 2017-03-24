@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb"
+	"github.com/zhexuany/influxdb-cluster"
 )
 
 var mutex sync.RWMutex
@@ -37,7 +37,7 @@ type Service struct {
 	Logger   *log.Logger
 	store    *store
 
-	Node *influxdb.Node
+	Node *influxdb_cluster.Node
 }
 
 // NewService returns a new instance of Service.

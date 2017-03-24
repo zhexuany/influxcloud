@@ -66,7 +66,7 @@ type Server struct {
 	// httpAPIAddr is the host:port combination for the main HTTP API for querying and writing data
 	httpAPIAddr string
 
-	config *meta.Config
+	config *meta.MetaConfig
 
 	// logOutput is the writer to which all services should be configured to
 	// write logs to after appension.
@@ -74,21 +74,22 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server built from a config.
-func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
+func NewServer(cfg *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 	// We need to ensure that a meta directory always exists even if
 	// we don't start the meta store.  node.json is always stored under
 	// the meta directory.
 
-	if err := os.MkdirAll(c.Meta.Dir, 0777); err != nil {
+	c := cfg.Meta
+	if err := os.MkdirAll(c.Dir, 0777); err != nil {
 		return nil, fmt.Errorf("mkdir all: %s", err)
 	}
 
-	path := filepath.Join(c.Meta.Dir, "node.json")
+	path := filepath.Join(c.Dir, "node.json")
 
 	// check file is existed or not
 	if _, err := os.Stat(path); err == nil {
 		// load node from node.json and check the error
-		node, err := influxdb_cluster.LoadNode(c.Meta.Dir)
+		node, err := influxdb_cluster.LoadNode(c.Dir)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, err
@@ -107,7 +108,7 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 		}
 	}
 
-	bind := c.Meta.BindAddress
+	bind := c.BindAddress
 
 	s := &Server{
 		buildInfo: *buildInfo,
@@ -118,13 +119,14 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 
 		Logger: log.New(os.Stderr, "", log.LstdFlags),
 
-		MetaClient: meta.NewClient(c.Meta),
+		MetaClient: meta.NewClient(c),
 
-		Service: meta.NewService(c.Meta),
+		Service: meta.NewService(c),
 
-		httpAPIAddr: c.Meta.HTTPBindAddress,
+		httpAPIAddr: c.HTTPBindAddress,
 
-		config:    c,
+		config: c,
+
 		logOutput: os.Stderr,
 	}
 
@@ -179,9 +181,9 @@ func (s *Server) Open() error {
 }
 
 func (s *Server) initializeMetaClient() {
-	metaServers := []string{s.config.Meta.RemoteHostname}
+	metaServers := []string{s.config.RemoteHostname}
 	s.MetaClient.SetMetaServers(metaServers)
-	s.MetaClient.SetTLS(s.config.Meta.HTTPSEnabled)
+	s.MetaClient.SetTLS(s.config.HTTPSEnabled)
 	if s.MetaClient.HTTPClient != nil {
 		s.MetaClient.SetHTTPClient(&http.Client{})
 	}

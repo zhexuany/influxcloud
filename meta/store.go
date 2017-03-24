@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/zhexuany/influxdb-cluster/meta/internal"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
+	"github.com/zhexuany/influxdb-cluster"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -51,7 +51,7 @@ type store struct {
 	raftAddr string
 	httpAddr string
 
-	node *influxdb.Node
+	node *influxdb_cluster.Node
 
 	raftLn net.Listener
 }
