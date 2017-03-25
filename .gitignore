@@ -5,5 +5,8 @@
 
 # Unignore all dirs
 !*/
-# log file
+# ignore log file
 *.log
+
+# ignore test file
+*.test
