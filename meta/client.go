@@ -22,7 +22,6 @@ import (
 	"github.com/zhexuany/influxdb-cluster/meta/internal"
 
 	"github.com/gogo/protobuf/proto"
-	"golang.org/x/crypto/bcrypt"
 	"path/filepath"
 )
 
@@ -89,11 +88,12 @@ func (c *Client) Open() error {
 		return ErrServiceUnavailable
 	}
 
+	// first load the meta data from disk
 	path := c.Path()
 	if path != "" {
 		c.Logger().Printf("using client state dir:%s", path)
 		if err := c.loadMetaServers(path); err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -101,21 +101,19 @@ func (c *Client) Open() error {
 		return nil
 	}
 
-	c.mu.Lock()
 	c.changed = make(chan struct{})
-	c.mu.Unlock()
+	c.closing = make(chan struct{})
+
 	c.cacheData = c.retryUntilSnapshot(0)
 	if c.cacheData == nil {
 		return fmt.Errorf("failed to snapshot %v", c.cacheData)
 	}
-	c.SetData(c.cacheData)
 
 	if err := c.updateMetaServers(); err != nil {
 		c.Logger().Println("failed to updated meta servers")
 	}
 
-	c.Logger().Println("")
-
+	go c.pollForUpdates()
 	return nil
 }
 
@@ -586,7 +584,6 @@ func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *meta.Reten
 		}
 	}
 
-	//TODO not sure why influxdb marshalbinary this
 	_, err := spec.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -671,7 +668,6 @@ func (c *Client) RetentionPolicy(database, name string) (rpi *meta.RetentionPoli
 		return nil, err
 	}
 
-	// TODO: This should not be handled here
 	if db == nil {
 		return nil, influxdb.ErrDatabaseNotFound(database)
 	}
@@ -728,10 +724,6 @@ func (c *Client) UpdateRetentionPolicy(database, name string, rpu *meta.Retentio
 
 	return c.retryUntilExec(internal.Command_UpdateRetentionPolicyCommand, internal.E_UpdateRetentionPolicyCommand_Command, cmd)
 }
-
-// bcryptCost is the cost associated with generating password with bcrypt.
-// This setting is lowered during testing to improve test suite performance.
-var bcryptCost = bcrypt.DefaultCost
 
 // ShardIDs returns a list of all shard ids.
 func (c *Client) ShardIDs() []uint64 {

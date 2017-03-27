@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tcp"
@@ -869,6 +870,7 @@ func newServiceAndClient() (string, *testService, *cluster_meta.Client) {
 	return cfg.Meta.Dir, s, c
 }
 
+// newClient will create a meta client and also open it
 func newClient(s *testService) *cluster_meta.Client {
 	cfg := newConfig()
 	c := cluster_meta.NewClient(cfg.Meta)
