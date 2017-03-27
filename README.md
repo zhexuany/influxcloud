@@ -1,5 +1,11 @@
 # influxdb-cluster
 
+## What is this prototype can do? 
+- edit meta node including adding, updating and deleting 
+- edit data node including adding, updating and deleting
+- distributed data in a basic form of shards across nodes in cluster via endpoint /wrtie
+- distributed query across cluster via endpoint /query 
+
 ## What is this prototype can not do but will add in future?
 - Raft Algorithm Optimization
 - Performance improvement
