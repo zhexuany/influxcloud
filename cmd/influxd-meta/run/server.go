@@ -66,7 +66,7 @@ type Server struct {
 	// httpAPIAddr is the host:port combination for the main HTTP API for querying and writing data
 	httpAPIAddr string
 
-	config *meta.MetaConfig
+	config *meta.Config
 
 	// logOutput is the writer to which all services should be configured to
 	// write logs to after appension.
@@ -74,12 +74,11 @@ type Server struct {
 }
 
 // NewServer returns a new instance of Server built from a config.
-func NewServer(cfg *meta.Config, buildInfo *BuildInfo) (*Server, error) {
+func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 	// We need to ensure that a meta directory always exists even if
 	// we don't start the meta store.  node.json is always stored under
 	// the meta directory.
 
-	c := cfg.Meta
 	if err := os.MkdirAll(c.Dir, 0777); err != nil {
 		return nil, fmt.Errorf("mkdir all: %s", err)
 	}
