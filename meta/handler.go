@@ -75,6 +75,7 @@ func newHandler(c *Config, s *Service) *handler {
 // SetRoutes sets the provided routes on the handler.
 func (h *handler) WrapHandler(name string, hf http.HandlerFunc) http.Handler {
 	var handler http.Handler
+	handler = http.HandlerFunc(hf)
 	handler = gzipFilter(handler)
 	handler = versionHeader(handler, h)
 	handler = requestID(handler)
@@ -519,6 +520,14 @@ func (h *handler) serveShowCluster(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) serveShowShards(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func (h *handler) servePeers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(h.store.peers()); err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+	}
 }
 
 // serveLease
