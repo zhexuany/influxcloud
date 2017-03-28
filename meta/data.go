@@ -343,6 +343,8 @@ func (data *Data) MarshalBinary() ([]byte, error) {
 func (data *Data) marshal() *internal.ClusterData {
 	pb := &internal.ClusterData{}
 
+	pb.MaxNodeID = proto.Uint64(data.MaxNodeID)
+
 	pb.Data, _ = data.Data.MarshalBinary()
 
 	pb.MetaNodes = make([]*internal.NodeInfo, len(data.MetaNodes))
@@ -354,8 +356,6 @@ func (data *Data) marshal() *internal.ClusterData {
 	for i := range data.DataNodes {
 		pb.DataNodes[i] = data.DataNodes[i].marshal()
 	}
-
-	pb.Users = make([]*internal.UserInfo, len(data.Users))
 
 	return pb
 }

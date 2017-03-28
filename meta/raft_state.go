@@ -46,7 +46,7 @@ func newRaftState(c *Config, addr string) *raftState {
 	}
 }
 
-func (r *raftState) open(s *store, ln net.Listener, initializePeers []string) error {
+func (r *raftState) open(s *store, ln net.Listener) error {
 	r.ln = ln
 	r.closing = make(chan struct{})
 
@@ -72,37 +72,7 @@ func (r *raftState) open(s *store, ln net.Listener, initializePeers []string) er
 	r.transport = raft.NewNetworkTransport(r.raftLayer, 3, 10*time.Second, config.LogOutput)
 
 	// Create peer storage.
-	r.peerStore = &peerStore{}
-
-	// This server is joining the raft cluster for the first time if initializePeers are passed in
-	if len(initializePeers) > 0 {
-		if err := r.peerStore.SetPeers(initializePeers); err != nil {
-			return err
-		}
-	}
-
-	peers, err := r.peerStore.Peers()
-	if err != nil {
-		return err
-	}
-
-	// If no peers are set in the config or there is one and we are it, then start as a single server.
-	if len(initializePeers) <= 1 {
-		config.EnableSingleNode = true
-
-		// Ensure we can always become the leader
-		config.DisableBootstrapAfterElect = false
-
-		// Make sure our peer address is here.  This happens with either a single node cluster
-		// or a node joining the cluster, as no one else has that information yet.
-		if !raft.PeerContained(peers, r.addr) {
-			if err := r.peerStore.SetPeers([]string{r.addr}); err != nil {
-				return err
-			}
-		}
-
-		peers = []string{r.addr}
-	}
+	r.peerStore = raft.NewJSONPeers(filepath.Join(r.path, "peers.json"), r.transport)
 
 	// Create the log store and stable store.
 	store, err := raftboltdb.NewBoltStore(filepath.Join(r.path, "raft.db"))

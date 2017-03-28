@@ -133,14 +133,9 @@ func (s *Service) Open() error {
 	}
 
 	// Open the store.  The addresses passed in are remotely accessible.
-	s.Logger.Println("Creating raft store on HTTP and raft addtrs is ", s.httpAddr, s.raftAddr)
 	s.store = newStore(s.config, s.remoteAddr(s.httpAddr), s.remoteAddr(s.raftAddr))
 	s.store.node = s.Node
 
-	// Begin listening for requests in a separate goroutine.
-	go s.serve()
-
-	s.Logger.Println("Opening raft store listener at ", s.raftAddr)
 	if err := s.store.open(s.RaftListener); err != nil {
 		return err
 	}
@@ -149,6 +144,9 @@ func (s *Service) Open() error {
 	handler.logger = s.Logger
 	handler.store = s.store
 	s.handler = handler
+
+	// Begin listening for requests in a separate goroutine.
+	go s.serve()
 
 	return nil
 }

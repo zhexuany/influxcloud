@@ -775,11 +775,17 @@ func TestMetaService_Ping(t *testing.T) {
 
 	swg.Wait()
 
-	c := cluster_meta.NewClient(cfgs[0])
-	c.SetMetaServers(joinPeers)
+	cfg := cfgs[0]
+	c := cluster_meta.NewClient(cfg)
+	c.SetMetaServers([]string{cfg.HTTPBindAddress})
+
+	// peer := joinPeers[1]
+	// c.JoinMetaServer(peer, peer)
+
 	if err := c.Open(); err != nil {
 		t.Fatal(err)
 	}
+
 	defer c.Close()
 
 	if err := c.Ping(false); err != nil {
