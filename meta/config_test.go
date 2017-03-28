@@ -11,7 +11,7 @@ import (
 
 func TestConfig_Parse(t *testing.T) {
 	// Parse configuration.
-	var c meta.MetaConfig
+	var c meta.Config
 	if _, err := toml.Decode(`
 enabled = false
 dir = "/tmp/foo"

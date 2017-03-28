@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"fmt"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tcp"
 	"github.com/influxdata/influxdb/toml"
 	influxdb_cluster "github.com/zhexuany/influxdb-cluster"
 	cluster_meta "github.com/zhexuany/influxdb-cluster/meta"
+	"sync"
 )
 
 func TestMetaService_CreateDatabase(t *testing.T) {
@@ -746,59 +746,60 @@ func TestMetaService_PersistClusterIDAfterRestart(t *testing.T) {
 	t.Parallel()
 
 	cfg := newConfig()
-	defer os.RemoveAll(cfg.Meta.Dir)
+	defer os.RemoveAll(cfg.Dir)
 }
 
 func TestMetaService_Ping(t *testing.T) {
-	// cfgs := make([]*meta.Config, 3)
-	// srvs := make([]*testService, 3)
-	// joinPeers := freePorts(len(cfgs))
+	cfgs := make([]*cluster_meta.Config, 3)
+	srvs := make([]*testService, 3)
+	joinPeers := freePorts(len(cfgs))
 
-	// var swg sync.WaitGroup
-	// swg.Add(len(cfgs))
+	var swg sync.WaitGroup
+	swg.Add(len(cfgs))
 
-	// for i, _ := range cfgs {
-	// c := newConfig()
-	// c.HTTPBindAddress = joinPeers[i]
-	// cfgs[i] = c
+	for i, _ := range cfgs {
+		c := newConfig()
+		c.HTTPBindAddress = joinPeers[i]
+		cfgs[i] = c
 
-	// srvs[i] = newService(c)
-	// go func(i int, srv *testService) {
-	// 	defer swg.Done()
-	// 	if err := srv.Open(); err != nil {
-	// 		t.Fatalf("error opening server %d: %s", i, err)
-	// 	}
-	// }(i, srvs[i])
-	// defer srvs[i].Close()
-	// defer os.RemoveAll(c.Dir)
-	// }
-	// swg.Wait()
+		srvs[i] = newService(c)
+		go func(i int, srv *testService) {
+			defer swg.Done()
+			if err := srv.Open(); err != nil {
+				t.Fatalf("error opening server %d: %s", i, err)
+			}
+		}(i, srvs[i])
+		defer srvs[i].Close()
+		defer os.RemoveAll(c.Dir)
+	}
 
-	// c := meta.NewClient()
-	// c.SetMetaServers(joinPeers)
-	// if err := c.Open(); err != nil {
-	// 	t.Fatal(err)
-	// }
-	// defer c.Close()
+	swg.Wait()
 
-	// if err := c.Ping(false); err != nil {
-	// 	t.Fatalf("ping false all failed: %s", err)
-	// }
-	// if err := c.Ping(true); err != nil {
-	// 	t.Fatalf("ping false true failed: %s", err)
-	// }
+	c := cluster_meta.NewClient(cfgs[0])
+	c.SetMetaServers(joinPeers)
+	if err := c.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
 
-	// srvs[1].Close()
-	// // give the server time to close
-	// time.Sleep(time.Second)
+	if err := c.Ping(false); err != nil {
+		t.Fatalf("ping false all failed: %s", err)
+	}
+	if err := c.Ping(true); err != nil {
+		t.Fatalf("ping false true failed: %s", err)
+	}
 
-	// if err := c.Ping(false); err != nil {
-	// 	t.Fatalf("ping false some failed: %s", err)
-	// }
+	srvs[1].Close()
+	// give the server time to close
+	time.Sleep(time.Second)
 
-	// if err := c.Ping(true); err == nil {
-	// 	t.Fatal("expected error on ping")
-	// }
+	if err := c.Ping(false); err != nil {
+		t.Fatalf("ping false some failed: %s", err)
+	}
+
+	if err := c.Ping(true); err == nil {
+		t.Fatal("expected error on ping")
+	}
 }
 
 func TestMetaService_AcquireLease(t *testing.T) {
@@ -867,13 +868,13 @@ func newServiceAndClient() (string, *testService, *cluster_meta.Client) {
 
 	c := newClient(s)
 
-	return cfg.Meta.Dir, s, c
+	return cfg.Dir, s, c
 }
 
 // newClient will create a meta client and also open it
 func newClient(s *testService) *cluster_meta.Client {
 	cfg := newConfig()
-	c := cluster_meta.NewClient(cfg.Meta)
+	c := cluster_meta.NewClient(cfg)
 	c.SetMetaServers([]string{s.HTTPAddr()})
 	if err := c.Open(); err != nil {
 		panic(err)
@@ -883,10 +884,10 @@ func newClient(s *testService) *cluster_meta.Client {
 
 func newConfig() *cluster_meta.Config {
 	cfg := cluster_meta.NewConfig()
-	cfg.Meta.BindAddress = "127.0.0.1:0"
-	cfg.Meta.HTTPBindAddress = "127.0.0.1:0"
-	cfg.Meta.Dir = testTempDir(2)
-	cfg.Meta.LeaseDuration = toml.Duration(1 * time.Second)
+	cfg.BindAddress = "127.0.0.1:0"
+	cfg.HTTPBindAddress = "127.0.0.1:0"
+	cfg.Dir = testTempDir(2)
+	cfg.LeaseDuration = toml.Duration(1 * time.Second)
 	return cfg
 }
 
@@ -919,7 +920,7 @@ func (t *testService) Close() error {
 
 func newService(cfg *cluster_meta.Config) *testService {
 	// Open shared TCP connection.
-	ln, err := net.Listen("tcp", cfg.Meta.BindAddress)
+	ln, err := net.Listen("tcp", cfg.BindAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -930,8 +931,8 @@ func newService(cfg *cluster_meta.Config) *testService {
 	if err != nil {
 		panic(err)
 	}
-	s := cluster_meta.NewService(cfg.Meta)
-	s.Node = influxdb_cluster.NewNode(cfg.Meta.Dir)
+	s := cluster_meta.NewService(cfg)
+	s.Node = influxdb_cluster.NewNode(cfg.Dir)
 	s.RaftListener = mux.Listen(cluster_meta.MuxHeader)
 
 	go mux.Serve(ln)

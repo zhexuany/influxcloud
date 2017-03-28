@@ -26,7 +26,7 @@ const (
 // consensus operations.
 type raftState struct {
 	wg        sync.WaitGroup
-	config    *MetaConfig
+	config    *Config
 	closing   chan struct{}
 	raft      *raft.Raft
 	transport *raft.NetworkTransport
@@ -39,14 +39,14 @@ type raftState struct {
 	path      string
 }
 
-func newRaftState(c *MetaConfig, addr string) *raftState {
+func newRaftState(c *Config, addr string) *raftState {
 	return &raftState{
 		config: c,
 		addr:   addr,
 	}
 }
 
-func (r *raftState) open(s *store, ln net.Listener) error {
+func (r *raftState) open(s *store, ln net.Listener, initializePeers []string) error {
 	r.ln = ln
 	r.closing = make(chan struct{})
 
@@ -57,8 +57,6 @@ func (r *raftState) open(s *store, ln net.Listener) error {
 	if r.config.ClusterTracing {
 		config.Logger = r.logger
 	}
-
-	//call loadConfigEnvOverrides
 	config.HeartbeatTimeout = time.Duration(r.config.HeartbeatTimeout)
 	config.ElectionTimeout = time.Duration(r.config.ElectionTimeout)
 	config.LeaderLeaseTimeout = time.Duration(r.config.LeaderLeaseTimeout)
@@ -74,12 +72,36 @@ func (r *raftState) open(s *store, ln net.Listener) error {
 	r.transport = raft.NewNetworkTransport(r.raftLayer, 3, 10*time.Second, config.LogOutput)
 
 	// Create peer storage.
-	r.peerStore = raft.NewJSONPeers(r.path, r.transport)
+	r.peerStore = &peerStore{}
 
-	//check wheather node itself is in peerStore or not
-	peers, _ := r.peers()
-	if ok := raft.PeerContained(peers, r.addr); !ok {
-		r.removePeer(r.addr)
+	// This server is joining the raft cluster for the first time if initializePeers are passed in
+	if len(initializePeers) > 0 {
+		if err := r.peerStore.SetPeers(initializePeers); err != nil {
+			return err
+		}
+	}
+
+	peers, err := r.peerStore.Peers()
+	if err != nil {
+		return err
+	}
+
+	// If no peers are set in the config or there is one and we are it, then start as a single server.
+	if len(initializePeers) <= 1 {
+		config.EnableSingleNode = true
+
+		// Ensure we can always become the leader
+		config.DisableBootstrapAfterElect = false
+
+		// Make sure our peer address is here.  This happens with either a single node cluster
+		// or a node joining the cluster, as no one else has that information yet.
+		if !raft.PeerContained(peers, r.addr) {
+			if err := r.peerStore.SetPeers([]string{r.addr}); err != nil {
+				return err
+			}
+		}
+
+		peers = []string{r.addr}
 	}
 
 	// Create the log store and stable store.
@@ -177,6 +199,15 @@ func (r *raftState) apply(b []byte) error {
 	return nil
 }
 
+func (r *raftState) lastIndex() uint64 {
+	return r.raft.LastIndex()
+}
+
+func (r *raftState) snapshot() error {
+	future := r.raft.Snapshot()
+	return future.Error()
+}
+
 // addPeer adds addr to the list of peers in the cluster.
 func (r *raftState) addPeer(addr string) error {
 	peers, err := r.peerStore.Peers()
@@ -193,7 +224,6 @@ func (r *raftState) addPeer(addr string) error {
 	if fut := r.raft.AddPeer(addr); fut.Error() != nil {
 		return fut.Error()
 	}
-
 	return nil
 }
 
@@ -254,21 +284,16 @@ type raftLayer struct {
 	closed chan struct{}
 }
 
+type raftLayerAddr struct {
+	addr string
+}
+
 func (r *raftLayerAddr) Network() string {
 	return "tcp"
 }
 
 func (r *raftLayerAddr) String() string {
 	return r.addr
-}
-
-// Addr returns the local address for the layer.
-func (l *raftLayer) Addr() net.Addr {
-	return l.addr
-}
-
-type raftLayerAddr struct {
-	addr string
 }
 
 // newRaftLayer returns a new instance of raftLayer.
@@ -279,6 +304,11 @@ func newRaftLayer(addr string, ln net.Listener) *raftLayer {
 		conn:   make(chan net.Conn),
 		closed: make(chan struct{}),
 	}
+}
+
+// Addr returns the local address for the layer.
+func (l *raftLayer) Addr() net.Addr {
+	return l.addr
 }
 
 // Dial creates a new network connection.
@@ -301,3 +331,22 @@ func (l *raftLayer) Accept() (net.Conn, error) { return l.ln.Accept() }
 
 // Close closes the layer.
 func (l *raftLayer) Close() error { return l.ln.Close() }
+
+// peerStore is an in-memory implementation of raft.PeerStore
+type peerStore struct {
+	mu    sync.RWMutex
+	peers []string
+}
+
+func (m *peerStore) Peers() ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.peers, nil
+}
+
+func (m *peerStore) SetPeers(peers []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.peers = peers
+	return nil
+}

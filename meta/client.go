@@ -66,11 +66,11 @@ type Client struct {
 
 	nodeID uint64
 
-	config *MetaConfig
+	config *Config
 }
 
 // NewClient returns a new *Client.
-func NewClient(config *MetaConfig) *Client {
+func NewClient(config *Config) *Client {
 	return &Client{
 		changed:             make(chan struct{}),
 		closing:             make(chan struct{}),
@@ -98,7 +98,7 @@ func (c *Client) Open() error {
 	}
 
 	if metas := c.MetaServers(); len(metas) == 0 {
-		return nil
+		c.Logger().Printf("meta servers is empty")
 	}
 
 	c.changed = make(chan struct{})

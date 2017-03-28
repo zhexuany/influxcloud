@@ -52,12 +52,37 @@ const (
 
 // Config represents the meta configuration.
 type Config struct {
-	Meta *MetaConfig `toml:"meta"`
+	Enabled bool   `toml:"enabled"`
+	Dir     string `toml:"dir"`
+	// RemoteHostname is the hostname portion to use when registering meta node
+	// addresses.  This hostname must be resolvable from other nodes.
+	RemoteHostname string `toml:"-"`
+
+	// this is deprecated. Should use the address from run/config.go
+	BindAddress string `toml:"bind-address"`
+
+	// HTTPBindAddress is the bind address for the metaservice HTTP API
+	HTTPBindAddress  string `toml:"http-bind-address"`
+	HTTPSEnabled     bool   `toml:"https-enabled"`
+	HTTPSCertificate string `toml:"https-certificate"`
+	// JoinPeers if specified gives other metastore servers to join this server to the cluster
+	JoinPeers            []string      `toml:"-"`
+	RetentionAutoCreate  bool          `toml:"retention-autocreate"`
+	ElectionTimeout      toml.Duration `toml:"election-timeout"`
+	HeartbeatTimeout     toml.Duration `toml:"heartbeat-timeout"`
+	LeaderLeaseTimeout   toml.Duration `toml:"leader-lease-timeout"`
+	CommitTimeout        toml.Duration `toml:"commit-timeout"`
+	ClusterTracing       bool          `toml:"cluster-tracing"`
+	RaftPromotionEnabled bool          `toml:"raft-promotion-enabled"`
+	LoggingEnabled       bool          `toml:"logging-enabled"`
+	PprofEnabled         bool          `toml:"pprof-enabled"`
+
+	LeaseDuration toml.Duration `toml:"lease-duration"`
 }
 
 // NewConfig builds a new configuration with default values.
 func NewConfig() *Config {
-	meta := &MetaConfig{
+	cfg := &Config{
 		Enabled:              true, // enabled by default
 		BindAddress:          DefaultRaftBindAddress,
 		HTTPBindAddress:      DefaultHTTPBindAddress,
@@ -71,9 +96,7 @@ func NewConfig() *Config {
 		LoggingEnabled:       DefaultLoggingEnabled,
 		JoinPeers:            []string{},
 	}
-	return &Config{
-		Meta: meta,
-	}
+	return cfg
 }
 
 func NewDemoConfig() *Config {
@@ -90,13 +113,16 @@ func NewDemoConfig() *Config {
 		return nil
 	}
 
-	c.Meta.Dir = filepath.Join(homeDir, ".influxdb/meta")
+	c.Dir = filepath.Join(homeDir, ".influxdb/meta")
 
 	return c
 }
 
 func (c *Config) Validate() error {
-	return c.Meta.Validate()
+	if c.Dir == "" {
+		return errors.New("Meta.Dir must be specified")
+	}
+	return nil
 }
 
 // ApplyEnvOverrides apply the environment configuration on top of the config.
@@ -224,40 +250,4 @@ func DefaultHost(hostname, addr string) (string, error) {
 		return net.JoinHostPort(hostname, port), nil
 	}
 	return addr, nil
-}
-
-type MetaConfig struct {
-	Enabled bool   `toml:"enabled"`
-	Dir     string `toml:"dir"`
-	// RemoteHostname is the hostname portion to use when registering meta node
-	// addresses.  This hostname must be resolvable from other nodes.
-	RemoteHostname string `toml:"-"`
-
-	// this is deprecated. Should use the address from run/config.go
-	BindAddress string `toml:"bind-address"`
-
-	// HTTPBindAddress is the bind address for the metaservice HTTP API
-	HTTPBindAddress  string `toml:"http-bind-address"`
-	HTTPSEnabled     bool   `toml:"https-enabled"`
-	HTTPSCertificate string `toml:"https-certificate"`
-	// JoinPeers if specified gives other metastore servers to join this server to the cluster
-	JoinPeers            []string      `toml:"-"`
-	RetentionAutoCreate  bool          `toml:"retention-autocreate"`
-	ElectionTimeout      toml.Duration `toml:"election-timeout"`
-	HeartbeatTimeout     toml.Duration `toml:"heartbeat-timeout"`
-	LeaderLeaseTimeout   toml.Duration `toml:"leader-lease-timeout"`
-	CommitTimeout        toml.Duration `toml:"commit-timeout"`
-	ClusterTracing       bool          `toml:"cluster-tracing"`
-	RaftPromotionEnabled bool          `toml:"raft-promotion-enabled"`
-	LoggingEnabled       bool          `toml:"logging-enabled"`
-	PprofEnabled         bool          `toml:"pprof-enabled"`
-
-	LeaseDuration toml.Duration `toml:"lease-duration"`
-}
-
-func (m *MetaConfig) Validate() error {
-	if m.Dir == "" {
-		return errors.New("Meta.Dir must be specified")
-	}
-	return nil
 }

@@ -26,7 +26,7 @@ type Service struct {
 
 	version string
 
-	config   *MetaConfig
+	config   *Config
 	handler  *handler
 	ln       net.Listener
 	httpAddr string
@@ -41,7 +41,7 @@ type Service struct {
 }
 
 // NewService returns a new instance of Service.
-func NewService(c *MetaConfig) *Service {
+func NewService(c *Config) *Service {
 	s := &Service{
 		config:   c,
 		httpAddr: c.HTTPBindAddress,

@@ -40,7 +40,7 @@ type store struct {
 	mu      sync.RWMutex
 	closing chan struct{}
 
-	config      *MetaConfig
+	config      *Config
 	data        *Data
 	raftState   *raftState
 	dataChanged chan struct{}
@@ -57,7 +57,7 @@ type store struct {
 }
 
 // newStore will create a new metastore with the passed in config
-func newStore(c *MetaConfig, httpAddr, raftAddr string) *store {
+func newStore(c *Config, httpAddr, raftAddr string) *store {
 	s := store{
 		data: &Data{
 			Data: &meta.Data{
@@ -197,7 +197,7 @@ func (s *store) openRaft(raftln net.Listener) error {
 	rs.logger = s.logger
 	rs.path = s.path
 
-	if err := rs.open(s, raftln); err != nil {
+	if err := rs.open(s, raftln, s.config.JoinPeers); err != nil {
 		return err
 	}
 	s.raftState = rs
