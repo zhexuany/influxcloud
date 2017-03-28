@@ -104,29 +104,27 @@ func (s *store) open(raftln net.Listener) error {
 
 	// Wait for a leader to be elected so we know the raft log is loaded
 	// and up to date
-	if s.raftState.raft != nil {
-		if err := s.waitForLeader(0); err != nil {
-			return fmt.Errorf("raft: %s", err)
-		}
+	// if err := s.waitForLeader(0); err != nil {
+	// 	return fmt.Errorf("raft: %s", err)
+	// }
 
-		// Already have a leader, now start to join cluster
-		n := &NodeInfo{
-			Host: s.raftAddr,
-		}
-		if _, err := s.join(n); err != nil {
-			return fmt.Errorf("raft: %s", err)
-		}
-		s.logger.Printf("Raft is opened")
-	}
-	// If this is first meta node wanting to join cluster
-	// Just set this meta node as leader, not need for selecting new leader
-	if peers := s.peers(); len(peers) > 1 {
-		// Since there mutiple nodes in cluster, We have to
-		// select a new leader when a new meta node want to join
-		if err := s.waitForLeader(time.Duration(s.config.ElectionTimeout)); err != nil {
-			return err
-		}
-	}
+	// // Already have a leader, now start to join cluster
+	// n := &NodeInfo{
+	// 	Host: s.raftAddr,
+	// }
+	// if _, err := s.join(n); err != nil {
+	// 	return fmt.Errorf("raft: %s", err)
+	// }
+
+	// s.logger.Printf("Raft is opened")
+
+	// if peers := s.peers(); len(peers) <= 1 {
+	// 	// Since there mutiple nodes in cluster, We have to
+	// 	// select a new leader when a new meta node want to join
+	// 	if err := s.waitForLeader(time.Duration(s.config.ElectionTimeout)); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
@@ -197,7 +195,7 @@ func (s *store) openRaft(raftln net.Listener) error {
 	rs.logger = s.logger
 	rs.path = s.path
 
-	if err := rs.open(s, raftln, s.config.JoinPeers); err != nil {
+	if err := rs.open(s, raftln); err != nil {
 		return err
 	}
 	s.raftState = rs
