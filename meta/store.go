@@ -88,6 +88,36 @@ func newStore(c *Config, httpAddr, raftAddr string) *store {
 func (s *store) open(raftln net.Listener) error {
 	s.logger.Printf("Using data dir: %v", s.path)
 
+	joinPeers, err := s.filterAddr(s.config.JoinPeers, s.httpAddr)
+	if err != nil {
+		return err
+	}
+
+	joinPeers = s.config.JoinPeers
+	var initializePeers []string
+	if len(joinPeers) > 0 {
+		c := NewClient(s.config)
+		c.SetMetaServers(joinPeers)
+		c.SetTLS(s.config.HTTPSEnabled)
+		for {
+			peers := c.peers()
+			if !Peers(peers).Contains(s.raftAddr) {
+				peers = append(peers, s.raftAddr)
+			}
+			if len(s.config.JoinPeers)-len(peers) == 0 {
+				initializePeers = peers
+				break
+			}
+
+			if len(peers) > len(s.config.JoinPeers) {
+				s.logger.Printf("waiting for join peers to match config specified. found %v, config specified %v", peers, s.config.JoinPeers)
+			} else {
+				s.logger.Printf("Waiting for %d join peers.  Have %v. Asking nodes: %v", len(s.config.JoinPeers)-len(peers), peers, joinPeers)
+			}
+			time.Sleep(time.Second)
+		}
+	}
+
 	if err := s.setOpen(); err != nil {
 		return err
 	}
@@ -98,35 +128,79 @@ func (s *store) open(raftln net.Listener) error {
 	}
 
 	// Start to open the raft store.
-	if err := s.openRaft(raftln); err != nil {
+	if err := s.openRaft(initializePeers, raftln); err != nil {
 		return fmt.Errorf("raft: %s", err)
+	}
+
+	if len(joinPeers) > 0 {
+		c := NewClient(s.config)
+		c.SetMetaServers(joinPeers)
+		c.SetTLS(s.config.HTTPSEnabled)
+		if err := c.Open(); err != nil {
+			return err
+		}
+		defer c.Close()
+
+		n, err := c.JoinMetaServer(s.httpAddr, s.raftAddr)
+		if err != nil {
+			return err
+		}
+
+		s.node.ID = n.ID
+		if err := s.node.Save(); err != nil {
+			return err
+		}
+
 	}
 
 	// Wait for a leader to be elected so we know the raft log is loaded
 	// and up to date
-	// if err := s.waitForLeader(0); err != nil {
-	// 	return fmt.Errorf("raft: %s", err)
-	// }
+	if err := s.waitForLeader(0); err != nil {
+		return fmt.Errorf("raft: %s", err)
+	}
 
-	// // Already have a leader, now start to join cluster
-	// n := &NodeInfo{
-	// 	Host: s.raftAddr,
-	// }
-	// if _, err := s.join(n); err != nil {
-	// 	return fmt.Errorf("raft: %s", err)
-	// }
-
-	// s.logger.Printf("Raft is opened")
-
-	// if peers := s.peers(); len(peers) <= 1 {
-	// 	// Since there mutiple nodes in cluster, We have to
-	// 	// select a new leader when a new meta node want to join
-	// 	if err := s.waitForLeader(time.Duration(s.config.ElectionTimeout)); err != nil {
-	// 		return err
-	// 	}
-	// }
+	// Make sure this server is in the list of metanodes
+	peers, err := s.raftState.peers()
+	if err != nil {
+		return err
+	}
+	if len(peers) <= 1 {
+		// we have to loop here because if the hostname has changed
+		// raft will take a little bit to normalize so that this host
+		// will be marked as the leader
+		for {
+			err := s.setMetaNode(s.httpAddr, s.raftAddr)
+			if err == nil {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 
 	return nil
+}
+
+// setMetaNode is used when the raft group has only a single peer. It will
+// either create a metanode or update the information for the one metanode
+// that is there. It's used because hostnames can change
+func (s *store) setMetaNode(addr, raftAddr string) error {
+	val := &internal.SetMetaNodeCommand{
+		HTTPAddr: proto.String(addr),
+		TCPAddr:  proto.String(raftAddr),
+		Rand:     proto.Uint64(uint64(rand.Int63())),
+	}
+	t := internal.Command_SetMetaNodeCommand
+	cmd := &internal.Command{Type: &t}
+	if err := proto.SetExtension(cmd, internal.E_SetMetaNodeCommand_Command, val); err != nil {
+		panic(err)
+	}
+
+	b, err := proto.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+
+	return s.apply(b)
 }
 
 func (s *store) setOpen() error {
@@ -187,7 +261,7 @@ func (s *store) filterAddr(addrs []string, filter string) ([]string, error) {
 	return joinPeers, nil
 }
 
-func (s *store) openRaft(raftln net.Listener) error {
+func (s *store) openRaft(initializePeers []string, raftln net.Listener) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -195,7 +269,7 @@ func (s *store) openRaft(raftln net.Listener) error {
 	rs.logger = s.logger
 	rs.path = s.path
 
-	if err := rs.open(s, raftln); err != nil {
+	if err := rs.open(s, raftln, initializePeers); err != nil {
 		return err
 	}
 	s.raftState = rs
@@ -455,44 +529,23 @@ func (s *store) apply(b []byte) error {
 
 // join adds a new server to the metaservice and raft
 func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
-	if !s.ready() {
-		return nil, fmt.Errorf("strore is not ready yet. Try again later.")
+	s.mu.RLock()
+	if s.raftState == nil {
+		s.mu.RUnlock()
+		return nil, fmt.Errorf("store not open")
+	}
+	s.logger.Println("adding peer")
+	if err := s.raftState.addPeer(n.TCPHost); err != nil {
+		s.mu.RUnlock()
+		s.logger.Println("adding peer", err)
+		return nil, err
+	}
+	s.mu.RUnlock()
+
+	if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
+		return nil, err
 	}
 
-	// determine raft store has a leader or not
-	if l := s.leader(); l == "" {
-		// l is empty indicating there is no leader
-		// in cluster. We clost it first with protection of lock
-		// and reoopen it
-		s.mu.RLock()
-		s.raftState.close()
-		s.mu.RUnlock()
-
-		if err := s.openRaft(s.raftLn); err != nil {
-			return nil, err
-		}
-
-		if err := s.waitForLeader(0); err != nil {
-			return nil, err
-		}
-
-		// Create Mete Node Here
-		if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
-			return nil, err
-		}
-	} else {
-		// leader is present in cluster, now adding peer
-		s.mu.RLock()
-		if err := s.raftState.addPeer(n.TCPHost); err != nil {
-			s.mu.RUnlock()
-			return nil, err
-		}
-		s.mu.RUnlock()
-
-		if err := s.createMetaNode(n.Host, n.TCPHost); err != nil {
-			return nil, err
-		}
-	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, node := range s.data.MetaNodes {

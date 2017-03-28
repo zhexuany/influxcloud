@@ -89,31 +89,36 @@ func (c *Client) Open() error {
 	}
 
 	// first load the meta data from disk
-	path := c.Path()
-	if path != "" {
-		c.Logger().Printf("using client state dir:%s", path)
-		if err := c.loadMetaServers(path); err != nil {
-			c.Logger().Fatalf("failed to load meta sever data from %s", path)
-		}
-	}
+	// path := c.Path()
+	// if path != "" {
+	// 	c.Logger().Printf("using client state dir:%s", path)
+	// 	if err := c.loadMetaServers(path); err != nil {
+	// 		c.Logger().Fatalf("failed to load meta sever data from %s", path)
+	// 	}
+	// }
 
-	if metas := c.MetaServers(); len(metas) == 0 {
-		return fmt.Errorf("MetaServers is empty. It shold at least contain itslef")
-	}
+	// if metas := c.MetaServers(); len(metas) == 0 {
+	// 	return fmt.Errorf("MetaServers is empty. It shold at least contain itslef")
+	// }
+
+	// c.changed = make(chan struct{})
+	// c.closing = make(chan struct{})
+
+	// c.cacheData = c.retryUntilSnapshot(0)
+	// if c.cacheData == nil {
+	// 	return fmt.Errorf("failed to snapshot %v", c.cacheData)
+	// }
+
+	// if err := c.updateMetaServers(); err != nil {
+	// 	c.Logger().Println("failed to updated meta servers")
+	// }
 
 	c.changed = make(chan struct{})
 	c.closing = make(chan struct{})
-
 	c.cacheData = c.retryUntilSnapshot(0)
-	if c.cacheData == nil {
-		return fmt.Errorf("failed to snapshot %v", c.cacheData)
-	}
-
-	if err := c.updateMetaServers(); err != nil {
-		c.Logger().Println("failed to updated meta servers")
-	}
 
 	go c.pollForUpdates()
+
 	return nil
 }
 
@@ -901,24 +906,27 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 			url = redirectServer
 			redirectServer = ""
 		} else {
-			metaServers := c.MetaServers()
-			if currentServer >= len(metaServers) {
+			c.mu.RLock()
+
+			if currentServer >= len(c.metaServers) {
 				// We've tried every server, wait a second before
 				// trying again
 				time.Sleep(time.Second)
 				currentServer = 0
 			}
-			server := metaServers[currentServer]
+			server := c.metaServers[currentServer]
+			c.mu.RUnlock()
 
 			url = c.url(server) + "/join"
 		}
 
-		resp, err := http.Post(url, "aplication/json", bytes.NewBuffer(b))
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(b))
 		if err != nil {
 			currentServer++
 			continue
 		}
 
+		c.logger.Println("using url ", url)
 		// Successfully joined
 		if resp.StatusCode == http.StatusOK {
 			defer resp.Body.Close()
@@ -929,10 +937,11 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 		}
 		resp.Body.Close()
 
-		// We tried to join a meta node that was not the leader, retry at the node
+		// We tried to join a meta node that was not the leader, rety at the node
 		// they think is the leader.
 		if resp.StatusCode == http.StatusTemporaryRedirect {
 			redirectServer = resp.Header.Get("Location")
+			c.logger.Println("redirect to leader", redirectServer)
 			continue
 		}
 
@@ -1229,6 +1238,36 @@ func (c *Client) getSnapshot(server string, index uint64) (*Data, error) {
 	return data, nil
 }
 
+// peers returns the TCPHost addresses of all the metaservers
+func (c *Client) peers() []string {
+
+	var peers Peers
+	// query each server and keep track of who their peers are
+	for _, server := range c.metaServers {
+		url := c.url(server) + "/peers"
+		resp, err := http.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		// This meta-server might not be ready to answer, continue on
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		var p []string
+		if err := dec.Decode(&p); err != nil {
+			continue
+		}
+		peers = peers.Append(p...)
+	}
+
+	// Return the unique set of peer addresses
+	return []string(peers.Unique())
+}
+
 func (c *Client) url(server string) string {
 	url := fmt.Sprintf("://%s", server)
 
@@ -1395,3 +1434,33 @@ func (c *Client) tryHTTP() {
 }
 
 func (c *Client) doHTTPWithRedirect() {}
+
+type Peers []string
+
+func (peers Peers) Append(p ...string) Peers {
+	peers = append(peers, p...)
+
+	return peers.Unique()
+}
+
+func (peers Peers) Unique() Peers {
+	distinct := map[string]struct{}{}
+	for _, p := range peers {
+		distinct[p] = struct{}{}
+	}
+
+	var u Peers
+	for k := range distinct {
+		u = append(u, k)
+	}
+	return u
+}
+
+func (peers Peers) Contains(peer string) bool {
+	for _, p := range peers {
+		if p == peer {
+			return true
+		}
+	}
+	return false
+}

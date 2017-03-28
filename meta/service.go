@@ -136,10 +136,6 @@ func (s *Service) Open() error {
 	s.store = newStore(s.config, s.remoteAddr(s.httpAddr), s.remoteAddr(s.raftAddr))
 	s.store.node = s.Node
 
-	if err := s.store.open(s.RaftListener); err != nil {
-		return err
-	}
-
 	handler := newHandler(s.config, s)
 	handler.logger = s.Logger
 	handler.store = s.store
@@ -147,6 +143,10 @@ func (s *Service) Open() error {
 
 	// Begin listening for requests in a separate goroutine.
 	go s.serve()
+
+	if err := s.store.open(s.RaftListener); err != nil {
+		return err
+	}
 
 	return nil
 }

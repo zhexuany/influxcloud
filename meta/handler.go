@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"runtime"
 	"strconv"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
-	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/uuid"
 	"github.com/zhexuany/influxdb-cluster/meta/internal"
 )
@@ -39,13 +37,6 @@ type handler struct {
 		snapshot() (*Data, error)
 		apply(b []byte) error
 		join(n *NodeInfo) (*NodeInfo, error)
-		removePeer(peer string) error
-		leave(n *NodeInfo) error
-		createDataNode(addr, raftAddr string) error
-		updateDataNode(id uint64, host, tcpHost string) error
-		deleteDataNode(id uint64) error
-		createMetaNode(addr, raftAddr string) error
-		deleteMetaNode(id uint64) error
 		otherMetaServersHTTP() []string
 		peers() []string
 	}
@@ -53,20 +44,18 @@ type handler struct {
 
 	mu      sync.RWMutex
 	closing chan struct{}
-	leases  *meta.Leases
+	leases  *Leases
 }
 
 // newHandler returns a new instance of handler with routes.
 func newHandler(c *Config, s *Service) *handler {
-	// create a new handler based on MetaConfig
 	h := &handler{
 		s:              s,
 		config:         c,
-		pprofEnabled:   c.PprofEnabled,
 		logger:         log.New(os.Stderr, "[meta-http] ", log.LstdFlags),
 		loggingEnabled: c.ClusterTracing,
 		closing:        make(chan struct{}),
-		leases:         meta.NewLeases(time.Duration(c.LeaseDuration)),
+		leases:         NewLeases(time.Duration(c.LeaseDuration)),
 	}
 
 	return h
@@ -83,15 +72,12 @@ func (h *handler) WrapHandler(name string, hf http.HandlerFunc) http.Handler {
 		handler = logging(handler, name, h.logger)
 	}
 	handler = recovery(handler, name, h.logger) // make sure recovery is always last
+
 	return handler
 }
 
 // ServeHTTP responds to HTTP request to the handler.
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	pprof.Cmdline(w, r)
-	pprof.Profile(w, r)
-	pprof.Symbol(w, r)
-	pprof.Index(w, r)
 	switch r.Method {
 	case "GET":
 		switch r.URL.Path {
@@ -99,21 +85,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.WrapHandler("ping", h.servePing).ServeHTTP(w, r)
 		case "/lease":
 			h.WrapHandler("lease", h.serveLease).ServeHTTP(w, r)
+		case "/peers":
+			h.WrapHandler("peers", h.servePeers).ServeHTTP(w, r)
 		default:
 			h.WrapHandler("snapshot", h.serveSnapshot).ServeHTTP(w, r)
 		}
 	case "POST":
-		switch r.URL.Path {
-		case "/execute":
-			h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
-		case "/join":
-			h.WrapHandler("join", h.serveJoin).ServeHTTP(w, r)
-		case "/add-data":
-			h.WrapHandler("add-data", h.serveAddData).ServeHTTP(w, r)
-		case "/add-meta":
-			h.WrapHandler("add-meta", h.serveAddMeta).ServeHTTP(w, r)
-
-		}
+		h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 	}
@@ -142,239 +120,6 @@ func (h *handler) isClosed() bool {
 	}
 }
 
-func (h *handler) redirectLeader(w http.ResponseWriter, r *http.Request, url string) {
-	l := h.store.leaderHTTP()
-	if l == "" {
-		// No cluster leader. Client will have to try again latr.
-		h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-	}
-	scheme := "http://"
-	if h.config.HTTPSEnabled {
-		scheme = "https://"
-	}
-
-	l = scheme + l + url
-	http.Redirect(w, r, l, http.StatusTemporaryRedirect)
-}
-
-func (h *handler) serveJoin(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		h.httpError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	n := &NodeInfo{}
-	if err := json.Unmarshal(body, n); err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	node, err := h.store.join(n)
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/join")
-		return
-	}
-
-	// Return the node with newly assigned ID as json
-	w.Header().Add("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(node); err != nil {
-		h.jsonError(err, w, http.StatusInternalServerError)
-	}
-}
-
-func (h *handler) serveLeave(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		h.httpError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	n := &NodeInfo{}
-	if err := json.Unmarshal(body, n); err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	err = h.store.leave(n)
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/leave")
-		return
-	} else {
-		h.jsonError(err, w, http.StatusInternalServerError)
-	}
-}
-
-func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	node := NodeInfo{}
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		h.jsonError(err, w, http.StatusBadRequest)
-		return
-	}
-	if err := json.Unmarshal(body, node); err != nil {
-		h.jsonError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	if _, err := http.PostForm(h.config.RemoteHostname, nil); err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-	}
-
-	err := h.store.createDataNode(node.Host, node.TCPHost)
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/add-data")
-		return
-	}
-
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Add("Content-Type", "application/json")
-
-	return
-}
-
-func (h *handler) serveRemoveData(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	idStr := r.URL.Query().Get("id")
-
-	id, err := strconv.ParseUint(idStr, 64, 128)
-	if err != nil {
-		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
-		return
-
-	}
-
-	err = h.store.deleteDataNode(id)
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/delete-data")
-		return
-	}
-
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Return the node with newly assigned ID as json
-	w.Header().Add("Content-Type", "application/json")
-
-	return
-}
-
-func (h *handler) serveUpdateData(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) verifyDataNode() {
-
-}
-
-func (h *handler) serveAddMeta(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	node := NodeInfo{}
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		h.jsonError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	if err := json.Unmarshal(body, node); err != nil {
-		h.jsonError(err, w, http.StatusBadRequest)
-		return
-	}
-
-	err := h.store.createMetaNode(node.Host, node.TCPHost)
-
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/add-meta")
-		return
-	}
-
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Return the node with newly assigned ID as json
-	w.Header().Add("Content-Type", "application/json")
-
-	return
-}
-
-func (h *handler) serveRemoveMeta(w http.ResponseWriter, r *http.Request) {
-	if h.isClosed() {
-		h.httpError(fmt.Errorf("server closed"), w, http.StatusServiceUnavailable)
-		return
-	}
-
-	idStr := r.URL.Query().Get("id")
-
-	id, err := strconv.ParseUint(idStr, 64, 128)
-	if err != nil {
-		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
-		return
-
-	}
-
-	err = h.store.deleteMetaNode(id)
-	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/delete-meta")
-		return
-	}
-
-	if err != nil {
-		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	// Return the node with newly assigned ID as json
-	w.Header().Add("Content-Type", "application/json")
-
-	return
-}
-
-type RPCCall struct {
-}
-
-func (rpc RPCCall) send() {
-
-}
-
-func (h *handler) sendDataNodeJoin() {
-
-}
-
-func (h *handler) sendDataNodeLeave() {
-
-}
-
 // serveExec executes the requested command.
 func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	if h.isClosed() {
@@ -389,6 +134,46 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.URL.Path == "/join" {
+		n := &NodeInfo{}
+		if err := json.Unmarshal(body, n); err != nil {
+			h.httpError(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		node, err := h.store.join(n)
+		if err == raft.ErrNotLeader {
+			//FIXME metanode is already in raft. but not in the data
+			l := h.store.leaderHTTP()
+			if l == "" {
+				// No cluster leader. Client will have to try again later.
+				h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
+				return
+			}
+			scheme := "http://"
+			if h.config.HTTPSEnabled {
+				scheme = "https://"
+			}
+
+			l = scheme + l + "/join"
+			http.Redirect(w, r, l, http.StatusTemporaryRedirect)
+			return
+		}
+
+		if err != nil {
+			h.httpError(err, w, http.StatusInternalServerError)
+			return
+		}
+
+		// Return the node with newly assigned ID as json
+		w.Header().Add("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(node); err != nil {
+			h.httpError(err, w, http.StatusInternalServerError)
+		}
+
+		return
+	}
+
 	// Make sure it's a valid command.
 	if err := validateCommand(body); err != nil {
 		h.httpError(err, w, http.StatusBadRequest)
@@ -400,7 +185,19 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.apply(body); err != nil {
 		// If we aren't the leader, redirect client to the leader.
 		if err == raft.ErrNotLeader {
-			h.redirectLeader(w, r, "/execute")
+			l := h.store.leaderHTTP()
+			if l == "" {
+				// No cluster leader. Client will have to try again later.
+				h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
+				return
+			}
+			scheme := "http://"
+			if h.config.HTTPSEnabled {
+				scheme = "https://"
+			}
+
+			l = scheme + l + "/execute"
+			http.Redirect(w, r, l, http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -486,6 +283,7 @@ func (h *handler) servePing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Println("receive request from client")
 	leader := h.store.leader()
 	healthy := true
 	for _, n := range h.store.otherMetaServersHTTP() {
@@ -520,17 +318,6 @@ func (h *handler) servePing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.httpError(fmt.Errorf("one or more metaservers not up"), w, http.StatusInternalServerError)
-}
-
-func (h *handler) serveStatus(w http.ResponseWriter, r *http.Request) {
-
-}
-func (h *handler) serveShowCluster(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *handler) serveShowShards(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (h *handler) servePeers(w http.ResponseWriter, r *http.Request) {
@@ -688,16 +475,53 @@ func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler 
 	})
 }
 
-func (h *handler) jsonError(err error, w http.ResponseWriter, status int) {
+func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
 	if h.loggingEnabled {
 		h.logger.Println(err)
 	}
 	http.Error(w, "", status)
 }
 
-func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
-	if h.loggingEnabled {
-		h.logger.Println(err)
+type Lease struct {
+	Name       string    `json:"name"`
+	Expiration time.Time `json:"expiration"`
+	Owner      uint64    `json:"owner"`
+}
+
+type Leases struct {
+	mu sync.Mutex
+	m  map[string]*Lease
+	d  time.Duration
+}
+
+func NewLeases(d time.Duration) *Leases {
+	return &Leases{
+		m: make(map[string]*Lease),
+		d: d,
 	}
-	http.Error(w, "", status)
+}
+
+func (leases *Leases) Acquire(name string, nodeID uint64) (*Lease, error) {
+	leases.mu.Lock()
+	defer leases.mu.Unlock()
+
+	l, ok := leases.m[name]
+	if ok {
+		if time.Now().After(l.Expiration) || l.Owner == nodeID {
+			l.Expiration = time.Now().Add(leases.d)
+			l.Owner = nodeID
+			return l, nil
+		}
+		return l, errors.New("another node has the lease")
+	}
+
+	l = &Lease{
+		Name:       name,
+		Expiration: time.Now().Add(leases.d),
+		Owner:      nodeID,
+	}
+
+	leases.m[name] = l
+
+	return l, nil
 }
