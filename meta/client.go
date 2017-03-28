@@ -93,12 +93,12 @@ func (c *Client) Open() error {
 	if path != "" {
 		c.Logger().Printf("using client state dir:%s", path)
 		if err := c.loadMetaServers(path); err != nil {
-			return err
+			c.Logger().Fatalf("failed to load meta sever data from %s", path)
 		}
 	}
 
 	if metas := c.MetaServers(); len(metas) == 0 {
-		c.Logger().Printf("meta servers is empty")
+		return fmt.Errorf("MetaServers is empty. It shold at least contain itslef")
 	}
 
 	c.changed = make(chan struct{})
@@ -237,7 +237,7 @@ func (c *Client) Ping(checkAllMetaServers bool) error {
 	c.mu.RLock()
 	server := c.metaServers[0]
 	c.mu.RUnlock()
-	url := server + "/ping"
+	url := c.url(server) + "/ping"
 	if checkAllMetaServers {
 		url = url + "?all=true"
 	}
@@ -910,10 +910,10 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 			}
 			server := metaServers[currentServer]
 
-			url = server + "/add/meta"
+			url = c.url(server) + "/join"
 		}
 
-		resp, err := c.post(url, "aplication/json", bytes.NewBuffer(b))
+		resp, err := http.Post(url, "aplication/json", bytes.NewBuffer(b))
 		if err != nil {
 			currentServer++
 			continue
@@ -1206,7 +1206,7 @@ func (c *Client) getSnapshot(server string, index uint64) (*Data, error) {
 		return nil, errors.New("server host empty")
 	}
 	// resp, err := c.get(server + fmt.Sprintf("?index=%d", index))
-	resp, err := http.Get(server + fmt.Sprintf("?index=%d", index))
+	resp, err := http.Get(c.url(server) + fmt.Sprintf("?index=%d", index))
 
 	if err != nil {
 		return nil, err
@@ -1229,6 +1229,18 @@ func (c *Client) getSnapshot(server string, index uint64) (*Data, error) {
 	return data, nil
 }
 
+func (c *Client) url(server string) string {
+	url := fmt.Sprintf("://%s", server)
+
+	if c.tls {
+		url = "https" + url
+	} else {
+		url = "http" + url
+	}
+
+	return url
+}
+
 func (c *Client) retryUntilSnapshot(idx uint64) *Data {
 	currentServer := 0
 	for {
@@ -1247,7 +1259,7 @@ func (c *Client) retryUntilSnapshot(idx uint64) *Data {
 			return data
 		}
 
-		c.logger.Printf("failure getting snapshot from %s: %s", server, err.Error())
+		c.Logger().Printf("failure getting snapshot from %s: %s", server, err.Error())
 		time.Sleep(errSleep)
 
 		currentServer++
