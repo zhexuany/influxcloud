@@ -106,6 +106,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/execute":
 			h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
+		case "/join":
+			h.WrapHandler("join", h.serveJoin).ServeHTTP(w, r)
 		case "/add-data":
 			h.WrapHandler("add-data", h.serveAddData).ServeHTTP(w, r)
 		case "/add-meta":
@@ -219,10 +221,14 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addr := r.URL.Query().Get("addr")
-	raftAddr := r.URL.Query().Get("raftAddr")
-	if addr == "" || raftAddr == "" {
-		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
+	node := NodeInfo{}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		h.jsonError(err, w, http.StatusBadRequest)
+		return
+	}
+	if err := json.Unmarshal(body, node); err != nil {
+		h.jsonError(err, w, http.StatusBadRequest)
 		return
 	}
 
@@ -230,7 +236,7 @@ func (h *handler) serveAddData(w http.ResponseWriter, r *http.Request) {
 		h.httpError(err, w, http.StatusInternalServerError)
 	}
 
-	err := h.store.createDataNode(addr, raftAddr)
+	err := h.store.createDataNode(node.Host, node.TCPHost)
 	if err == raft.ErrNotLeader {
 		h.redirectLeader(w, r, "/add-data")
 		return
@@ -263,7 +269,7 @@ func (h *handler) serveRemoveData(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.deleteDataNode(id)
 	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/delete/data")
+		h.redirectLeader(w, r, "/delete-data")
 		return
 	}
 
@@ -292,15 +298,20 @@ func (h *handler) serveAddMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addr := r.URL.Query().Get("addr")
-	raftAddr := r.URL.Query().Get("raftAddr")
-
-	if addr == "" || raftAddr == "" {
-		h.httpError(errors.New("invalid parameters"), w, http.StatusBadRequest)
+	node := NodeInfo{}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		h.jsonError(err, w, http.StatusBadRequest)
 		return
 	}
 
-	err := h.store.createMetaNode(addr, raftAddr)
+	if err := json.Unmarshal(body, node); err != nil {
+		h.jsonError(err, w, http.StatusBadRequest)
+		return
+	}
+
+	err := h.store.createMetaNode(node.Host, node.TCPHost)
+
 	if err == raft.ErrNotLeader {
 		h.redirectLeader(w, r, "/add-meta")
 		return
@@ -334,7 +345,7 @@ func (h *handler) serveRemoveMeta(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.deleteMetaNode(id)
 	if err == raft.ErrNotLeader {
-		h.redirectLeader(w, r, "/delete/meta")
+		h.redirectLeader(w, r, "/delete-meta")
 		return
 	}
 
