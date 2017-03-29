@@ -899,6 +899,8 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 
 	currentServer := 0
 	redirectServer := ""
+	//TODO spinning is ok but need a way to log this.
+	// or after a specific seconds just return error
 	for {
 		// get the server to try to join against
 		var url string
@@ -926,7 +928,6 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 			continue
 		}
 
-		c.logger.Println("using url ", url)
 		// Successfully joined
 		if resp.StatusCode == http.StatusOK {
 			defer resp.Body.Close()

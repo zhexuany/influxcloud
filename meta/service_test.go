@@ -775,34 +775,33 @@ func TestMetaService_Ping(t *testing.T) {
 	}
 	swg.Wait()
 
-	// cfg := cfgs[0]
-	// c := cluster_meta.NewClient(cfg)
-	// c.SetMetaServers(joinPeers)
-	// // if err := c.Open(); err != nil {
-	// // 	t.Fatal(err)
-	// // }
+	cfg := cfgs[0]
+	c := cluster_meta.NewClient(cfg)
+	c.SetMetaServers(joinPeers)
+	if err := c.Open(); err != nil {
+		t.Fatal(err)
+	}
 
-	// t.Fatalf("should finish open")
-	// defer c.Close()
+	defer c.Close()
 
-	// if err := c.Ping(false); err != nil {
-	// 	t.Fatalf("ping false all failed: %s", err)
-	// }
-	// if err := c.Ping(true); err != nil {
-	// 	t.Fatalf("ping false true failed: %s", err)
-	// }
+	if err := c.Ping(false); err != nil {
+		t.Fatalf("ping false all failed: %s", err)
+	}
+	if err := c.Ping(true); err != nil {
+		t.Fatalf("ping false true failed: %s", err)
+	}
 
-	// srvs[1].Close()
-	// // give the server time to close
-	// time.Sleep(time.Second)
+	srvs[1].Close()
+	// give the server time to close
+	time.Sleep(time.Second)
 
-	// if err := c.Ping(false); err != nil {
-	// 	t.Fatalf("ping false some failed: %s", err)
-	// }
+	if err := c.Ping(false); err != nil {
+		t.Fatalf("ping false some failed: %s", err)
+	}
 
-	// if err := c.Ping(true); err == nil {
-	// 	t.Fatal("expected error on ping")
-	// }
+	if err := c.Ping(true); err == nil {
+		t.Fatal("expected error on ping")
+	}
 }
 
 func TestMetaService_AcquireLease(t *testing.T) {

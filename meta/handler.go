@@ -143,7 +143,6 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 
 		node, err := h.store.join(n)
 		if err == raft.ErrNotLeader {
-			//FIXME metanode is already in raft. but not in the data
 			l := h.store.leaderHTTP()
 			if l == "" {
 				// No cluster leader. Client will have to try again later.
@@ -283,7 +282,6 @@ func (h *handler) servePing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Println("receive request from client")
 	leader := h.store.leader()
 	healthy := true
 	for _, n := range h.store.otherMetaServersHTTP() {

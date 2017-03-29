@@ -85,6 +85,7 @@ func newStore(c *Config, httpAddr, raftAddr string) *store {
 }
 
 // open opens and initializes the raft store.
+//TODO refactor is needed. Currentyly, we use client to join node. This is not a good choice.
 func (s *store) open(raftln net.Listener) error {
 	s.logger.Printf("Using data dir: %v", s.path)
 
@@ -534,10 +535,9 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 		s.mu.RUnlock()
 		return nil, fmt.Errorf("store not open")
 	}
-	s.logger.Println("adding peer")
+
 	if err := s.raftState.addPeer(n.TCPHost); err != nil {
 		s.mu.RUnlock()
-		s.logger.Println("adding peer", err)
 		return nil, err
 	}
 	s.mu.RUnlock()
