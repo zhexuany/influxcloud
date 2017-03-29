@@ -91,7 +91,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.WrapHandler("snapshot", h.serveSnapshot).ServeHTTP(w, r)
 		}
 	case "POST":
-		h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
+		switch r.URL.Path {
+		case "/join":
+			h.WrapHandler("join", h.serveJoin).ServeHTTP(w, r)
+		default:
+			h.WrapHandler("execute", h.serveExec).ServeHTTP(w, r)
+
+		}
 	default:
 		http.Error(w, "", http.StatusBadRequest)
 	}
@@ -120,6 +126,45 @@ func (h *handler) isClosed() bool {
 	}
 }
 
+func (h *handler) serveJoin(w http.ResponseWriter, r *http.Request) {
+	n := &NodeInfo{}
+	if err := json.NewDecoder(r.Body).Decode(n); err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	node, err := h.store.join(n)
+	if err == raft.ErrNotLeader {
+		l := h.store.leaderHTTP()
+		if l == "" {
+			// No cluster leader. Client will have to try again later.
+			h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
+			return
+		}
+		scheme := "http://"
+		if h.config.HTTPSEnabled {
+			scheme = "https://"
+		}
+
+		l = scheme + l + "/join"
+		http.Redirect(w, r, l, http.StatusTemporaryRedirect)
+		return
+	}
+
+	if err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+		return
+	}
+
+	// Return the node with newly assigned ID as json
+	w.Header().Add("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(node); err != nil {
+		h.httpError(err, w, http.StatusInternalServerError)
+	}
+
+	return
+}
+
 // serveExec executes the requested command.
 func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	if h.isClosed() {
@@ -131,45 +176,6 @@ func (h *handler) serveExec(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		h.httpError(err, w, http.StatusInternalServerError)
-		return
-	}
-
-	if r.URL.Path == "/join" {
-		n := &NodeInfo{}
-		if err := json.Unmarshal(body, n); err != nil {
-			h.httpError(err, w, http.StatusInternalServerError)
-			return
-		}
-
-		node, err := h.store.join(n)
-		if err == raft.ErrNotLeader {
-			l := h.store.leaderHTTP()
-			if l == "" {
-				// No cluster leader. Client will have to try again later.
-				h.httpError(errors.New("no leader"), w, http.StatusServiceUnavailable)
-				return
-			}
-			scheme := "http://"
-			if h.config.HTTPSEnabled {
-				scheme = "https://"
-			}
-
-			l = scheme + l + "/join"
-			http.Redirect(w, r, l, http.StatusTemporaryRedirect)
-			return
-		}
-
-		if err != nil {
-			h.httpError(err, w, http.StatusInternalServerError)
-			return
-		}
-
-		// Return the node with newly assigned ID as json
-		w.Header().Add("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(node); err != nil {
-			h.httpError(err, w, http.StatusInternalServerError)
-		}
-
 		return
 	}
 
