@@ -82,28 +82,28 @@ func (r *raftState) open(s *store, ln net.Listener, initializePeers []string) er
 		}
 	}
 
-	// peers, err := r.peerStore.Peers()
-	// if err != nil {
-	// 	return err
-	// }
+	peers, err := r.peerStore.Peers()
+	if err != nil {
+		return err
+	}
 
-	// // If no peers are set in the config or there is one and we are it, then start as a single server.
-	// if len(initializePeers) <= 1 {
-	// 	config.EnableSingleNode = true
+	// If no peers are set in the config or there is one and we are it, then start as a single server.
+	if len(initializePeers) <= 1 {
+		config.EnableSingleNode = true
 
-	// 	// Ensure we can always become the leader
-	// 	config.DisableBootstrapAfterElect = false
+		// Ensure we can always become the leader
+		config.DisableBootstrapAfterElect = false
 
-	// 	// Make sure our peer address is here.  This happens with either a single node cluster
-	// 	// or a node joining the cluster, as no one else has that information yet.
-	// 	if !raft.PeerContained(peers, r.addr) {
-	// 		if err := r.peerStore.SetPeers([]string{r.addr}); err != nil {
-	// 			return err
-	// 		}
-	// 	}
+		// Make sure our peer address is here.  This happens with either a single node cluster
+		// or a node joining the cluster, as no one else has that information yet.
+		if !raft.PeerContained(peers, r.addr) {
+			if err := r.peerStore.SetPeers([]string{r.addr}); err != nil {
+				return err
+			}
+		}
 
-	// 	peers = []string{r.addr}
-	// }
+		peers = []string{r.addr}
+	}
 
 	// Create the log store and stable store.
 	store, err := raftboltdb.NewBoltStore(filepath.Join(r.path, "raft.db"))

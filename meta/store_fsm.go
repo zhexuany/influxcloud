@@ -468,11 +468,11 @@ func (fsm *storeFSM) applyDeleteMetaNodeCommand(cmd *internal.Command, s *store)
 }
 
 func (fsm *storeFSM) applyCreateDataNodeCommand(cmd *internal.Command) interface{} {
-	// ext, _ := proto.GetExtension(cmd, internal.E_CreateDataNodeCommand_Command)
-	// v := ext.(*internal.CreateDataNodeCommand)
+	ext, _ := proto.GetExtension(cmd, internal.E_CreateDataNodeCommand_Command)
+	v := ext.(*internal.CreateDataNodeCommand)
 
 	other := fsm.data.Clone()
-	//TODO
+	other.CreateDataNode(v.GetHTTPAddr(), v.GetTCPAddr())
 
 	fsm.data = other
 	return nil

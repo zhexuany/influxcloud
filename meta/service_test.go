@@ -21,6 +21,7 @@ import (
 )
 
 func TestMetaService_CreateDatabase(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -49,6 +50,8 @@ func TestMetaService_CreateDatabase(t *testing.T) {
 }
 
 func TestMetaService_CreateDatabaseIfNotExists(t *testing.T) {
+
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -73,6 +76,7 @@ func TestMetaService_CreateDatabaseIfNotExists(t *testing.T) {
 }
 
 func TestMetaService_CreateDatabaseWithRetentionPolicy(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -110,6 +114,7 @@ func TestMetaService_CreateDatabaseWithRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_Databases(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -146,6 +151,7 @@ func TestMetaService_Databases(t *testing.T) {
 }
 
 func TestMetaService_DropDatabase(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -179,6 +185,7 @@ func TestMetaService_DropDatabase(t *testing.T) {
 }
 
 func TestMetaService_CreateRetentionPolicy(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -240,6 +247,7 @@ func TestMetaService_CreateRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_SetDefaultRetentionPolicy(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -282,6 +290,7 @@ func TestMetaService_SetDefaultRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_DropRetentionPolicy(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -334,6 +343,7 @@ func TestMetaService_DropRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_ContinuousQueries(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -377,6 +387,7 @@ func TestMetaService_ContinuousQueries(t *testing.T) {
 }
 
 func TestMetaService_Subscriptions_Create(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -412,6 +423,7 @@ func TestMetaService_Subscriptions_Create(t *testing.T) {
 }
 
 func TestMetaService_Subscriptions_Drop(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -458,6 +470,7 @@ func TestMetaService_Subscriptions_Drop(t *testing.T) {
 }
 
 func TestMetaService_Shards(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -524,6 +537,7 @@ func TestMetaService_Shards(t *testing.T) {
 }
 
 func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 }
 
@@ -531,12 +545,14 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 // is pointed at a server that isn't the leader, it automatically
 // hits the leader and finishes the command
 func TestMetaService_CommandAgainstNonLeader(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 }
 
 // Ensure that the client will fail over to another server if the leader goes
 // down. Also ensure that the cluster will come back up successfully after restart
 func TestMetaService_FailureAndRestartCluster(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 }
 
@@ -582,6 +598,7 @@ func TestMetaService_CreateDataNode(t *testing.T) {
 }
 
 func TestMetaService_DropDataNode(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -673,6 +690,7 @@ func rpi2rps(rpi *meta.RetentionPolicyInfo) *meta.RetentionPolicySpec {
 }
 
 func TestMetaService_DropDataNode_Reassign(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -743,6 +761,7 @@ func TestMetaService_DropDataNode_Reassign(t *testing.T) {
 }
 
 func TestMetaService_PersistClusterIDAfterRestart(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	cfg := newConfig()
@@ -750,6 +769,7 @@ func TestMetaService_PersistClusterIDAfterRestart(t *testing.T) {
 }
 
 func TestMetaService_Ping(t *testing.T) {
+	t.Parallel()
 	cfgs := make([]*cluster_meta.Config, 3)
 	srvs := make([]*testService, 3)
 	joinPeers := freePorts(len(cfgs))
@@ -805,6 +825,7 @@ func TestMetaService_Ping(t *testing.T) {
 }
 
 func TestMetaService_AcquireLease(t *testing.T) {
+	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c1 := newServiceAndClient()
