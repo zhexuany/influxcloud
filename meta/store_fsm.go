@@ -126,16 +126,10 @@ func (fsm *storeFSM) applyCreateDatabaseCommand(cmd *internal.Command) interface
 	}
 
 	s := (*store)(fsm)
-	//TODO revist this later
 	rpi := meta.RetentionPolicyInfo{}
 	err := rpi.UnmarshalBinary(v.GetRetentionPolicy())
 	if err == nil {
-		if err := other.CreateRetentionPolicy(v.GetName(), &meta.RetentionPolicyInfo{
-			Name:               rpi.Name,
-			ReplicaN:           rpi.ReplicaN,
-			Duration:           rpi.Duration,
-			ShardGroupDuration: rpi.ShardGroupDuration,
-		}, false); err != nil {
+		if err := other.CreateRetentionPolicy(v.GetName(), &rpi, false); err != nil {
 			if err == ErrRetentionPolicyExists {
 				return ErrRetentionPolicyConflict
 			}
@@ -155,7 +149,7 @@ func (fsm *storeFSM) applyCreateDatabaseCommand(cmd *internal.Command) interface
 		rpi := meta.NewRetentionPolicyInfo(autoCreateRetentionPolicyName)
 		rpi.ReplicaN = replicaN
 		rpi.Duration = autoCreateRetentionPolicyPeriod
-		if err := other.Data.CreateRetentionPolicy(v.GetName(), rpi, false); err != nil {
+		if err := other.Data.CreateRetentionPolicy(v.GetName(), rpi, true); err != nil {
 			return err
 		}
 	}
@@ -492,7 +486,8 @@ func (fsm *storeFSM) applyDeleteDataNodeCommand(cmd *internal.Command) interface
 
 //TODO finish these functions
 // func (fsm *storeFSM) applyUpdateDataNode(cmd *internal.Command) (interface{})            {}
-// func (fsm *storeFSM) applyCreateDatabase(cmd *internal.Command) (interface{})            {}
+// func (fsm *storeFSM) applyCreateDatabase(cmd *internal.Command) interface{} {}
+
 // func (fsm *storeFSM) applyDropDatabase(cmd *internal.Command) (interface{})              {}
 // func (fsm *storeFSM) applyCreateRetentionPolicy(cmd *internal.Command) (interface{})     {}
 // func (fsm *storeFSM) applyDropRetentionPolicy(cmd *internal.Command) (interface{})       {}

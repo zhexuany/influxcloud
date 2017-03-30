@@ -549,22 +549,11 @@ func (c *Client) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
 		return db, nil
 	}
 
-	rpi := c.defaultRetentionPolicyInfo(DefaultRetentionPolicyName, DefaultRetentionPolicyDuration)
-
-	// marshal rpi in order to insert it into
-	// protobuf
-	rpiB, err := rpi.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	// Prepare cmd that can be executed in cluster
 	cmd := &internal.CreateDatabaseCommand{
-		Name:            proto.String(name),
-		RetentionPolicy: rpiB,
+		Name: proto.String(name),
 	}
 
-	err = c.retryUntilExec(internal.Command_CreateDatabaseCommand, internal.E_CreateDatabaseCommand_Command, cmd)
+	err := c.retryUntilExec(internal.Command_CreateDatabaseCommand, internal.E_CreateDatabaseCommand_Command, cmd)
 	if err != nil {
 		return nil, err
 	}

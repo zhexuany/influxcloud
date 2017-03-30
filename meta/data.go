@@ -379,6 +379,12 @@ func (data *Data) unmarshal(pb *internal.ClusterData) {
 	for i, meta := range pb.GetMetaNodes() {
 		data.MetaNodes[i].unmarshal(meta)
 	}
+
+	data.DataNodes = make([]NodeInfo, len(pb.GetDataNodes()))
+	for i, d := range pb.GetDataNodes() {
+		data.DataNodes[i].unmarshal(d)
+	}
+
 }
 
 // CreateShardGroup creates a shard group on a database and policy for a given timestamp.
