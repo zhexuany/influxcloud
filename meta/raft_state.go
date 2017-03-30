@@ -179,8 +179,15 @@ func (r *raftState) close() error {
 	return nil
 }
 
+func (r *raftState) isClosed() bool {
+	return r.raft == nil
+}
+
 // apply applies a serialized command to the raft log.
 func (r *raftState) apply(b []byte) error {
+	if r.isClosed() {
+		return raft.ErrRaftShutdown
+	}
 	// Apply to raft log.
 	f := r.raft.Apply(b, 0)
 	if err := f.Error(); err != nil {
