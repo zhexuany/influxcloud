@@ -615,22 +615,11 @@ func (c *Client) CreateRetentionPolicy(database string, spec *meta.RetentionPoli
 		return nil, ErrRetentionPolicyDurationTooLow
 	}
 
-	_, err := spec.MarshalBinary()
+	rpiB, err := spec.NewRetentionPolicyInfo().MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
 
-	//
-	rpi := c.defaultRetentionPolicyInfo(spec.Name, *spec.Duration)
-	if rpi == nil {
-		return nil, ErrRetentionPolicyConflict
-	}
-
-	//
-	rpiB, err := rpi.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
 	cmd := &internal.CreateRetentionPolicyCommand{
 		Database:        proto.String(database),
 		RetentionPolicy: rpiB,
@@ -640,7 +629,7 @@ func (c *Client) CreateRetentionPolicy(database string, spec *meta.RetentionPoli
 		return nil, err
 	}
 
-	return c.RetentionPolicy(database, rpi.Name)
+	return c.RetentionPolicy(database, spec.Name)
 }
 
 // RetentionPolicy returns the requested retention policy info.

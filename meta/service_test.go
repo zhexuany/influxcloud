@@ -110,7 +110,6 @@ func TestMetaService_CreateDatabaseWithRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_Databases(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -147,7 +146,6 @@ func TestMetaService_Databases(t *testing.T) {
 }
 
 func TestMetaService_DropDatabase(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -181,7 +179,6 @@ func TestMetaService_DropDatabase(t *testing.T) {
 }
 
 func TestMetaService_CreateRetentionPolicy(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()

@@ -174,21 +174,17 @@ func (fsm *storeFSM) applyDropDatabaseCommand(cmd *internal.Command) interface{}
 }
 
 func (fsm *storeFSM) applyCreateRetentionPolicyCommand(cmd *internal.Command) interface{} {
-	// ext, _ := proto.GetExtension(cmd, internal.E_CreateRetentionPolicyCommand_Command)
-	// v := ext.(*internal.CreateRetentionPolicyCommand)
-	// pb := v.GetRetentionPolicy()
+	ext, _ := proto.GetExtension(cmd, internal.E_CreateRetentionPolicyCommand_Command)
+	v := ext.(*internal.CreateRetentionPolicyCommand)
+	rpi := meta.RetentionPolicyInfo{}
+	rpi.UnmarshalBinary(v.GetRetentionPolicy())
 
 	// Copy data and update.
 	other := fsm.data.Clone()
-	// if err := other.Data.CreateRetentionPolicy(v.GetDatabase(),
-	// 	&meta.RetentionPolicyInfo{
-	// 		Name:               pb.GetName(),
-	// 		ReplicaN:           int(pb.GetReplicaN()),
-	// 		Duration:           time.Duration(pb.GetDuration()),
-	// 		ShardGroupDuration: time.Duration(pb.GetShardGroupDuration()),
-	// 	}); err != nil {
-	// 	return err
-	// }
+	if err := other.Data.CreateRetentionPolicy(v.GetDatabase(), &rpi, false); err != nil {
+		return err
+	}
+
 	fsm.data = other
 
 	return nil
