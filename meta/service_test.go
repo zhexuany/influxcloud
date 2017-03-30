@@ -40,7 +40,7 @@ func TestMetaService_CreateDatabase(t *testing.T) {
 	}
 
 	// Make sure a default retention policy was created.
-	_, err = c.RetentionPolicy("db0", "autogen")
+	_, err = c.RetentionPolicy("db0", "default")
 	if err != nil {
 		t.Fatal(err)
 	} else if db.DefaultRetentionPolicy != "default" {
@@ -49,8 +49,6 @@ func TestMetaService_CreateDatabase(t *testing.T) {
 }
 
 func TestMetaService_CreateDatabaseIfNotExists(t *testing.T) {
-
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -75,7 +73,6 @@ func TestMetaService_CreateDatabaseIfNotExists(t *testing.T) {
 }
 
 func TestMetaService_CreateDatabaseWithRetentionPolicy(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()

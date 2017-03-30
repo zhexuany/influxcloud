@@ -578,18 +578,7 @@ func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *meta.Reten
 		}
 	}
 
-	_, err := spec.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get default retentionPolicy
-	rpi := c.defaultRetentionPolicyInfo(spec.Name, *spec.Duration)
-	if rpi == nil {
-		return nil, ErrRetentionPolicyConflict
-	}
-
-	rpiB, err := rpi.MarshalBinary()
+	rpiB, err := spec.NewRetentionPolicyInfo().MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +588,6 @@ func (c *Client) CreateDatabaseWithRetentionPolicy(name string, spec *meta.Reten
 		RetentionPolicy: rpiB,
 	}
 
-	//
 	err = c.retryUntilExec(internal.Command_CreateDatabaseCommand, internal.E_CreateDatabaseCommand_Command, cmd)
 	if err != nil {
 		return nil, err
