@@ -122,14 +122,14 @@ func (fsm *storeFSM) applyCreateDatabaseCommand(cmd *internal.Command) interface
 	// Copy data and update.
 	other := fsm.data.Clone()
 	if err := other.Data.CreateDatabase(v.GetName()); err != nil {
-		return nil
+		return err
 	}
 
 	s := (*store)(fsm)
 	rpi := meta.RetentionPolicyInfo{}
 	err := rpi.UnmarshalBinary(v.GetRetentionPolicy())
 	if err == nil {
-		if err := other.CreateRetentionPolicy(v.GetName(), &rpi, false); err != nil {
+		if err := other.CreateRetentionPolicy(v.GetName(), &rpi, true); err != nil {
 			if err == ErrRetentionPolicyExists {
 				return ErrRetentionPolicyConflict
 			}
@@ -211,7 +211,7 @@ func (fsm *storeFSM) applySetDefaultRetentionPolicyCommand(cmd *internal.Command
 	// Copy data and update.
 	other := fsm.data.Clone()
 	// if err := other.Data.SetDefaultRetentionPolicY(v.GetDatabase(), v.GetName()); err != nil {
-	// 	return err
+	// return err
 	// }
 	fsm.data = other
 
@@ -249,7 +249,8 @@ func (fsm *storeFSM) applyCreateShardGroupCommand(cmd *internal.Command) interfa
 
 	// Copy data and update.
 	other := fsm.data.Clone()
-	if err := other.Data.CreateShardGroup(v.GetDatabase(), v.GetPolicy(), time.Unix(0, v.GetTimestamp())); err != nil {
+	//NOTE: here we override original CreateShardGroup. It has to call directly from data instead of data.Data
+	if err := other.CreateShardGroup(v.GetDatabase(), v.GetPolicy(), time.Unix(0, v.GetTimestamp())); err != nil {
 		return err
 	}
 	fsm.data = other

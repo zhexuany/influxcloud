@@ -333,8 +333,77 @@ func (data *Data) DeleteDataNode(id uint64) error {
 	}
 	data.DataNodes = nodes
 
+	// Remove node id from all shard infos
+	for di, d := range data.Databases {
+		for ri, rp := range d.RetentionPolicies {
+			for sgi, sg := range rp.ShardGroups {
+				var (
+					nodeOwnerFreqs = make(map[int]int)
+					orphanedShards []meta.ShardInfo
+				)
+				// Look through all shards in the shard group and
+				// determine (1) if a shard no longer has any owners
+				// (orphaned); (2) if all shards in the shard group
+				// are orphaned; and (3) the number of shards in this
+				// group owned by each data node in the cluster.
+				for si, s := range sg.Shards {
+					// Track of how many shards in the group are
+					// owned by each data node in the cluster.
+					var nodeIdx = -1
+					for i, owner := range s.Owners {
+						if owner.NodeID == id {
+							nodeIdx = i
+						}
+						nodeOwnerFreqs[int(owner.NodeID)]++
+					}
+
+					if nodeIdx > -1 {
+						// Data node owns shard, so relinquish ownership
+						// and set new owners on the shard.
+						s.Owners = append(s.Owners[:nodeIdx], s.Owners[nodeIdx+1:]...)
+						data.Databases[di].RetentionPolicies[ri].ShardGroups[sgi].Shards[si].Owners = s.Owners
+					}
+
+					// Shard no longer owned. Will need reassigning
+					// an owner.
+					if len(s.Owners) == 0 {
+						orphanedShards = append(orphanedShards, s)
+					}
+				}
+
+				// Mark the shard group as deleted if it has no shards,
+				// or all of its shards are orphaned.
+				if len(sg.Shards) == 0 || len(orphanedShards) == len(sg.Shards) {
+					data.Databases[di].RetentionPolicies[ri].ShardGroups[sgi].DeletedAt = time.Now().UTC()
+					continue
+				}
+
+				// Reassign any orphaned shards. Delete the node we're
+				// dropping from the list of potential new owners.
+				delete(nodeOwnerFreqs, int(id))
+
+				for _, orphan := range orphanedShards {
+					newOwnerID, err := meta.NewShardOwner(orphan, nodeOwnerFreqs)
+					if err != nil {
+						return err
+					}
+
+					for si, s := range sg.Shards {
+						if s.ID == orphan.ID {
+							sg.Shards[si].Owners = append(sg.Shards[si].Owners, meta.ShardOwner{NodeID: newOwnerID})
+							data.Databases[di].RetentionPolicies[ri].ShardGroups[sgi].Shards = sg.Shards
+							break
+						}
+					}
+
+				}
+			}
+		}
+	}
+
 	return nil
 }
+
 func (data *Data) MarshalBinary() ([]byte, error) {
 	return proto.Marshal(data.marshal())
 }
@@ -420,7 +489,6 @@ func (data *Data) CreateShardGroup(database, policy string, timestamp time.Time)
 	// replicated the correct number of times.
 	shardN := len(data.DataNodes) / replicaN
 
-	//TODO finished generatedShards
 	// Create the shard group.
 	data.Data.MaxShardGroupID++
 	sgi := meta.ShardGroupInfo{}
@@ -428,9 +496,14 @@ func (data *Data) CreateShardGroup(database, policy string, timestamp time.Time)
 	sgi.StartTime = timestamp.Truncate(rpi.ShardGroupDuration).UTC()
 	sgi.EndTime = sgi.StartTime.Add(rpi.ShardGroupDuration).UTC()
 
-	sgi.Shards = data.generatedShards(shardN)
-	// Assign data nodes to shards via round robin.
-	// Start from a repeatably "random" place in the node list.
+	// Create shards on the group. TODO: move generated shards into
+	// generatedShards
+	sgi.Shards = make([]meta.ShardInfo, shardN)
+	for i := range sgi.Shards {
+		data.MaxShardID++
+		sgi.Shards[i] = meta.ShardInfo{ID: data.MaxShardID}
+	}
+
 	nodeIndex := int(data.Data.Index % uint64(len(data.DataNodes)))
 	for i := range sgi.Shards {
 		si := &sgi.Shards[i]
@@ -440,6 +513,8 @@ func (data *Data) CreateShardGroup(database, policy string, timestamp time.Time)
 			nodeIndex++
 		}
 	}
+
+	// sgi.Shards = data.generatedShards(shardN, replicaN)
 
 	// Retention policy has a new shard group, so update the policy. Shard
 	// Groups must be stored in sorted order, as other parts of the system
@@ -454,15 +529,8 @@ func (data *Data) gcd() {
 
 }
 
-func (data *Data) generatedShards(shardN int) []meta.ShardInfo {
-	// Create shards on the group.
-	shards := make([]meta.ShardInfo, shardN)
-	for i := range shards {
-		data.Data.MaxShardID++
-		shards[i] = meta.ShardInfo{ID: data.Data.MaxShardID}
-	}
-
-	return shards
+func (data *Data) generatedShards(shardN, replicaN int) []meta.ShardInfo {
+	return nil
 }
 
 func (data *Data) TruncateShardsGrops(sg *meta.ShardGroupInfo) error {

@@ -240,7 +240,6 @@ func TestMetaService_CreateRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_SetDefaultRetentionPolicy(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -283,7 +282,6 @@ func TestMetaService_SetDefaultRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_DropRetentionPolicy(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -336,7 +334,7 @@ func TestMetaService_DropRetentionPolicy(t *testing.T) {
 }
 
 func TestMetaService_ContinuousQueries(t *testing.T) {
-	t.Skip("not enabled")
+	t.Skip("not ready for performing this test. In prototype, all CQ are disabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -463,7 +461,6 @@ func TestMetaService_Subscriptions_Drop(t *testing.T) {
 }
 
 func TestMetaService_Shards(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -591,7 +588,6 @@ func TestMetaService_CreateDataNode(t *testing.T) {
 }
 
 func TestMetaService_DropDataNode(t *testing.T) {
-	t.Skip("wait createDatabased passed")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -629,6 +625,9 @@ func TestMetaService_DropDataNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if len(sg.Shards[0].Owners) != 2 {
+		t.Fatalf("Execpted %d owners but got %d owners", 2, len(sg.Shards[0].Owners))
+	}
 	// Dropping the first data server should result in that node ID
 	// being removed as an owner of the shard.
 	if err := c.DeleteDataNode(n1.ID); err != nil {
