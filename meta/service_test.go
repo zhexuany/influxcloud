@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tcp"
@@ -529,21 +530,275 @@ func TestMetaService_Shards(t *testing.T) {
 func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 	t.Skip("not enabled")
 	t.Parallel()
+	joinPeers := freePorts(4)
+	raftPeers := freePorts(4)
+
+	cfg1 := newConfig()
+	cfg1.HTTPBindAddress = joinPeers[0]
+	cfg1.BindAddress = raftPeers[0]
+	defer os.RemoveAll(cfg1.Dir)
+	cfg2 := newConfig()
+	cfg2.HTTPBindAddress = joinPeers[1]
+	cfg2.BindAddress = raftPeers[1]
+	defer os.RemoveAll(cfg2.Dir)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	cfg1.JoinPeers = joinPeers[0:2]
+	s1 := newService(cfg1)
+	go func() {
+		defer wg.Done()
+		if err := s1.Open(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	defer s1.Close()
+
+	cfg2.JoinPeers = joinPeers[0:2]
+	s2 := newService(cfg2)
+	go func() {
+		defer wg.Done()
+		if err := s2.Open(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	defer s2.Close()
+	wg.Wait()
+
+	cfg3 := newConfig()
+	joinPeers[2] = freePort()
+	cfg3.HTTPBindAddress = joinPeers[2]
+	raftPeers[2] = freePort()
+	cfg3.BindAddress = raftPeers[2]
+	defer os.RemoveAll(cfg3.Dir)
+
+	cfg3.JoinPeers = joinPeers[0:3]
+	s3 := newService(cfg3)
+	if err := s3.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer s3.Close()
+
+	c1 := cluster_meta.NewClient(cfg1)
+	c1.SetMetaServers(joinPeers[0:3])
+	if err := c1.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c1.Close()
+
+	metaNodes, _ := c1.MetaNodes()
+	if len(metaNodes) != 3 {
+		t.Fatalf("meta nodes wrong: %v", metaNodes)
+	}
+
+	c := cluster_meta.NewClient(cfg1)
+	c.SetMetaServers([]string{s1.HTTPAddr()})
+	if err := c.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	if err := c.DeleteMetaNode(3); err != nil {
+		t.Fatal(err)
+	}
+
+	metaNodes, _ = c.MetaNodes()
+	if len(metaNodes) != 2 {
+		t.Fatalf("meta nodes wrong: %v", metaNodes)
+	}
+
+	cfg4 := newConfig()
+	cfg4.HTTPBindAddress = freePort()
+	cfg4.BindAddress = freePort()
+	cfg4.JoinPeers = []string{joinPeers[0], joinPeers[1], cfg4.HTTPBindAddress}
+	defer os.RemoveAll(cfg4.Dir)
+	s4 := newService(cfg4)
+	if err := s4.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer s4.Close()
+
+	c2 := cluster_meta.NewClient(cfg4)
+	c2.SetMetaServers(cfg4.JoinPeers)
+	if err := c2.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+
+	metaNodes, _ = c2.MetaNodes()
+	if len(metaNodes) != 3 {
+		t.Fatalf("meta nodes wrong: %v", metaNodes)
+	}
 }
 
 // Ensure that if we attempt to create a database and the client
 // is pointed at a server that isn't the leader, it automatically
 // hits the leader and finishes the command
 func TestMetaService_CommandAgainstNonLeader(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
+	cfgs := make([]*cluster_meta.Config, 3)
+	srvs := make([]*testService, 3)
+	joinPeers := freePorts(len(cfgs))
+
+	var wg sync.WaitGroup
+	wg.Add(len(cfgs))
+
+	for i, _ := range cfgs {
+		c := newConfig()
+		c.HTTPBindAddress = joinPeers[i]
+		c.JoinPeers = joinPeers
+		cfgs[i] = c
+
+		srvs[i] = newService(c)
+		go func(srv *testService) {
+			defer wg.Done()
+			if err := srv.Open(); err != nil {
+				t.Fatal(err)
+			}
+		}(srvs[i])
+		defer srvs[i].Close()
+		defer os.RemoveAll(c.Dir)
+	}
+	wg.Wait()
+
+	for i := range cfgs {
+		c := cluster_meta.NewClient(cfgs[i])
+		c.SetMetaServers([]string{joinPeers[i]})
+		if err := c.Open(); err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+
+		metaNodes, _ := c.MetaNodes()
+		if len(metaNodes) != 3 {
+			t.Fatalf("node %d - meta nodes wrong: %v", i, metaNodes)
+		}
+
+		if _, err := c.CreateDatabase(fmt.Sprintf("foo%d", i)); err != nil {
+			t.Fatalf("node %d: %s", i, err)
+		}
+
+		if db, err := c.Database(fmt.Sprintf("foo%d", i)); db == nil || err != nil {
+			t.Fatalf("node %d: database foo wasn't created: %s", i, err)
+		}
+	}
 }
 
 // Ensure that the client will fail over to another server if the leader goes
 // down. Also ensure that the cluster will come back up successfully after restart
 func TestMetaService_FailureAndRestartCluster(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
+
+	cfgs := make([]*cluster_meta.Config, 3)
+	srvs := make([]*testService, 3)
+	joinPeers := freePorts(len(cfgs))
+	raftPeers := freePorts(len(cfgs))
+
+	var swg sync.WaitGroup
+	swg.Add(len(cfgs))
+	for i, _ := range cfgs {
+		c := newConfig()
+		c.HTTPBindAddress = joinPeers[i]
+		c.BindAddress = raftPeers[i]
+		c.JoinPeers = joinPeers
+		cfgs[i] = c
+
+		srvs[i] = newService(c)
+		go func(i int, srv *testService) {
+			defer swg.Done()
+			if err := srv.Open(); err != nil {
+				t.Logf("opening server %d", i)
+				t.Fatal(err)
+			}
+		}(i, srvs[i])
+
+		defer srvs[i].Close()
+		defer os.RemoveAll(c.Dir)
+	}
+	swg.Wait()
+
+	c := cluster_meta.NewClient(cfgs[0])
+	c.SetMetaServers(joinPeers)
+	if err := c.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	// check to see we were assigned a valid clusterID
+	c1ID := c.ClusterID()
+	if c1ID == 0 {
+		t.Fatalf("invalid cluster id: %d", c1ID)
+	}
+
+	if _, err := c.CreateDatabase("foo"); err != nil {
+		t.Fatal(err)
+	}
+
+	if db, err := c.Database("foo"); db == nil || err != nil {
+		t.Fatalf("database foo wasn't created: %s", err)
+	}
+
+	if err := srvs[0].Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := c.CreateDatabase("bar"); err != nil {
+		t.Fatal(err)
+	}
+
+	if db, err := c.Database("bar"); db == nil || err != nil {
+		t.Fatalf("database bar wasn't created: %s", err)
+	}
+
+	if err := srvs[1].Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := srvs[2].Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// give them a second to shut down
+	time.Sleep(time.Second)
+
+	// need to start them all at once so they can discover the bind addresses for raft
+	var wg sync.WaitGroup
+	wg.Add(len(cfgs))
+	for i, cfg := range cfgs {
+		srvs[i] = newService(cfg)
+		go func(srv *testService) {
+			if err := srv.Open(); err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(srvs[i])
+		defer srvs[i].Close()
+	}
+	wg.Wait()
+	time.Sleep(time.Second)
+
+	c2 := cluster_meta.NewClient(cfgs[0])
+	c2.SetMetaServers(joinPeers)
+	if err := c2.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer c2.Close()
+
+	c2ID := c2.ClusterID()
+	if c1ID != c2ID {
+		t.Fatalf("invalid cluster id. got: %d, exp: %d", c2ID, c1ID)
+	}
+
+	if db, err := c2.Database("bar"); db == nil || err != nil {
+		t.Fatalf("database bar wasn't created: %s", err)
+	}
+
+	if _, err := c2.CreateDatabase("asdf"); err != nil {
+		t.Fatal(err)
+	}
+
+	if db, err := c2.Database("asdf"); db == nil || err != nil {
+		t.Fatalf("database bar wasn't created: %s", err)
+	}
 }
 
 // Ensures that everything works after a host name change. This is
