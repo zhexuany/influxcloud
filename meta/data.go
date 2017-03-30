@@ -496,8 +496,23 @@ func (data *Data) CreateShardGroup(database, policy string, timestamp time.Time)
 	sgi.StartTime = timestamp.Truncate(rpi.ShardGroupDuration).UTC()
 	sgi.EndTime = sgi.StartTime.Add(rpi.ShardGroupDuration).UTC()
 
-	// Create shards on the group. TODO: move generated shards into
-	// generatedShards
+	// Create shards on the group.
+	data.generatedShards(&sgi, shardN, replicaN)
+
+	// Retention policy has a new shard group, so update the policy. Shard
+	// Groups must be stored in sorted order, as other parts of the system
+	// assume this to be the case.
+	rpi.ShardGroups = append(rpi.ShardGroups, sgi)
+	sort.Sort(meta.ShardGroupInfos(rpi.ShardGroups))
+
+	return nil
+}
+
+func (data *Data) gcd() {
+
+}
+
+func (data *Data) generatedShards(sgi *meta.ShardGroupInfo, shardN, replicaN int) {
 	sgi.Shards = make([]meta.ShardInfo, shardN)
 	for i := range sgi.Shards {
 		data.MaxShardID++
@@ -513,24 +528,6 @@ func (data *Data) CreateShardGroup(database, policy string, timestamp time.Time)
 			nodeIndex++
 		}
 	}
-
-	// sgi.Shards = data.generatedShards(shardN, replicaN)
-
-	// Retention policy has a new shard group, so update the policy. Shard
-	// Groups must be stored in sorted order, as other parts of the system
-	// assume this to be the case.
-	rpi.ShardGroups = append(rpi.ShardGroups, sgi)
-	sort.Sort(meta.ShardGroupInfos(rpi.ShardGroups))
-
-	return nil
-}
-
-func (data *Data) gcd() {
-
-}
-
-func (data *Data) generatedShards(shardN, replicaN int) []meta.ShardInfo {
-	return nil
 }
 
 func (data *Data) TruncateShardsGrops(sg *meta.ShardGroupInfo) error {
