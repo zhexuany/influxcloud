@@ -289,9 +289,9 @@ func (c *Client) acquireLease(name string) (*meta.Lease, error) {
 	c.mu.RUnlock()
 
 	for _, server := range servers {
-		url := fmt.Sprintf("%s/lease?name=%s&nodeid=%d", server, name, c.nodeID)
+		url := fmt.Sprintf("%s/lease?name=%s&nodeid=%d", c.url(server), name, c.nodeID)
 
-		resp, err := c.get(url)
+		resp, err := http.Get(url)
 		if err != nil {
 			return nil, err
 		}
@@ -299,18 +299,13 @@ func (c *Client) acquireLease(name string) (*meta.Lease, error) {
 
 		switch resp.StatusCode {
 		case http.StatusOK:
-			// Read lease JSON from response body.
-			b, e := ioutil.ReadAll(resp.Body)
-			if e != nil {
-				return nil, e
-			}
 			// Unmarshal JSON into a Lease.
 			l := &meta.Lease{}
-			if e = json.Unmarshal(b, l); e != nil {
-				return nil, e
+			if err := json.NewDecoder(resp.Body).Decode(l); err != nil {
+				return nil, err
 			}
 
-			return l, err
+			return l, nil
 		case http.StatusConflict:
 			err = errors.New("another node owns the lease")
 		case http.StatusServiceUnavailable:

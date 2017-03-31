@@ -528,8 +528,8 @@ func TestMetaService_Shards(t *testing.T) {
 }
 
 func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
+
 	joinPeers := freePorts(4)
 	raftPeers := freePorts(4)
 
@@ -579,7 +579,7 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 	}
 	defer s3.Close()
 
-	c1 := cluster_meta.NewClient(cfg1)
+	c1 := cluster_meta.NewClient(cfg3)
 	c1.SetMetaServers(joinPeers[0:3])
 	if err := c1.Open(); err != nil {
 		t.Fatal(err)
@@ -937,7 +937,6 @@ func rpi2rps(rpi *meta.RetentionPolicyInfo) *meta.RetentionPolicySpec {
 }
 
 func TestMetaService_DropDataNode_Reassign(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c := newServiceAndClient()
@@ -1016,7 +1015,6 @@ func TestMetaService_PersistClusterIDAfterRestart(t *testing.T) {
 }
 
 func TestMetaService_Ping(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 	cfgs := make([]*cluster_meta.Config, 3)
 	srvs := make([]*testService, 3)
@@ -1073,7 +1071,6 @@ func TestMetaService_Ping(t *testing.T) {
 }
 
 func TestMetaService_AcquireLease(t *testing.T) {
-	t.Skip("not enabled")
 	t.Parallel()
 
 	d, s, c1 := newServiceAndClient()

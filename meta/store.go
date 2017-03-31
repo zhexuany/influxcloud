@@ -165,6 +165,7 @@ func (s *store) open(raftln net.Listener) error {
 	if err != nil {
 		return err
 	}
+
 	if len(peers) <= 1 {
 		// we have to loop here because if the hostname has changed
 		// raft will take a little bit to normalize so that this host
@@ -557,24 +558,7 @@ func (s *store) join(n *NodeInfo) (*NodeInfo, error) {
 }
 
 func (s *store) leave(n *NodeInfo) error {
-	s.mu.RLock()
-	if s.raftState == nil {
-		s.mu.RUnlock()
-		return fmt.Errorf("strore is not open yet. Try again later.")
-	}
-	s.mu.RUnlock()
-
-	if err := s.deleteMetaNode(n.ID); err != nil {
-		return err
-	}
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if err := s.removePeer(n.TCPHost); err != nil {
-		return err
-	}
-
-	return nil
+	return s.removePeer(n.TCPHost)
 }
 
 // removePeer will remove a peer node according to peer's addr

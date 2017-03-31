@@ -431,7 +431,7 @@ func (fsm *storeFSM) applySetMetaNodeCommand(cmd *internal.Command) interface{} 
 		other.Data.ClusterID = uint64(v.GetRand())
 	}
 
-	// other.SetMetaNode(other.Data.ClusterID, v.GetHTTPAddr(), v.GetTCPAddr(), nil)
+	other.SetMetaNode(other.Data.ClusterID, v.GetHTTPAddr(), v.GetTCPAddr())
 
 	fsm.data = other
 	return nil

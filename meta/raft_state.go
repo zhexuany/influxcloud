@@ -232,6 +232,7 @@ func (r *raftState) addPeer(addr string) error {
 	if fut := r.raft.AddPeer(addr); fut.Error() != nil {
 		return fut.Error()
 	}
+
 	return nil
 }
 
