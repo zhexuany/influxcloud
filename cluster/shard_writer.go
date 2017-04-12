@@ -20,6 +20,7 @@ type ShardWriter struct {
 
 	MetaClient interface {
 		ShardOwner(shardID uint64) (database, policy string, sgi *meta.ShardGroupInfo)
+		DataNode(id uint64) (ni *meta.NodeInfo, err error)
 	}
 }
 
@@ -40,7 +41,7 @@ func (w *ShardWriter) WriteShard(shardID, ownerID uint64, points []models.Point)
 		if err != nil {
 			return fmt.Errorf("failed to marshal point: %v", err)
 		}
-		buf = append(buf, b)
+		buf = append(buf, b...)
 	}
 	return w.WriteShardBinary(shardID, ownerID, buf)
 
@@ -108,7 +109,7 @@ func (w *ShardWriter) WriteShardBinary(shardID, ownerID uint64, buf []byte) erro
 	}
 
 	// Unmarshal response.
-	var response WriteShardResponse
+	var response rpc.WriteShardResponse
 	if err := response.UnmarshalBinary(buf); err != nil {
 		return err
 	}

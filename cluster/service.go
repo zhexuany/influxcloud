@@ -2,17 +2,20 @@ package cluster
 
 import (
 	"expvar"
+	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
+	"fmt"
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"github.com/zhexuany/influxdb-cluster/rpc"
 	"github.com/zhexuany/influxdb-cluster/tlv"
-	"io"
 )
 
 // MaxMessageSize defines how large a message can be before we reject it
@@ -21,6 +24,7 @@ const MaxMessageSize = 1024 * 1024 * 1024 // 1GB
 // MuxHeader is the header byte used in the TCP mux.
 const MuxHeader = 2
 
+// Service reprsents a cluster service
 type Service struct {
 	mu sync.RWMutex
 
@@ -34,6 +38,8 @@ type Service struct {
 	}
 
 	TSDBStore coordinator.TSDBStore
+
+	ShardIteratorCreator coordinator.ShardIteratorCreator
 
 	Logger  *log.Logger
 	statMap *expvar.Map
@@ -49,14 +55,14 @@ func NewService(c Config) *Service {
 
 // Open opens the network listener and begins serving requests
 func (s *Service) Open() error {
-	s.Logger("Starting cluster service")
+	s.Logger.Println("Starting cluster service")
 	s.wg.Add(1)
 	go s.serve()
 
 	return nil
 }
 
-// SetLogger sets the internal logger to the logger passed in
+// SetLogOutput sets the internal logger to the logger passed in
 func (s *Service) SetLogOutput(l *log.Logger) {
 	s.Logger = l
 }
@@ -92,6 +98,7 @@ func (s *Service) serve() {
 	}
 }
 
+// Close close this service
 func (s *Service) Close() error {
 	if s.Listener != nil {
 		s.Listener.Close()
@@ -175,20 +182,21 @@ func (s *Service) handleConn(conn net.Conn) {
 func (s *Service) executeStatement(stmt influxql.Statement, database string) error {
 	switch t := stmt.(type) {
 	case *influxql.DropDatabaseStatement:
-		return s.TSDBStore.DeleteDatabase(t.Name)
+		// return s.TSDBStore.DeleteDatabase(t.Name)
 	case *influxql.DropMeasurementStatement:
-		return s.TSDBStore.DeleteMeasurement(database, t.Name)
+		// return s.TSDBStore.DeleteMeasurement(database, t.Name)
 	case *influxql.DropSeriesStatement:
-		return s.TSDBStore.DeleteSeries(database, t.Sources, t.Condition)
+		// return s.TSDBStore.DeleteSeries(database, t.Sources, t.Condition)
 	case *influxql.DropRetentionPolicyStatement:
-		return s.TSDBStore.DeleteRetentionPolicy(database, t.Name)
+		// return s.TSDBStore.DeleteRetentionPolicy(database, t.Name)
 	default:
 		return fmt.Errorf("%q should not be executed across a cluster", stmt.String())
 	}
+	return nil
 }
 func (s *Service) processWriteShardRequest(buf []byte) error {
 	// Build request
-	var req WriteShardRequest
+	var req rpc.WriteShardRequest
 	if err := req.UnmarshalBinary(buf); err != nil {
 		return err
 	}
@@ -208,7 +216,7 @@ func (s *Service) processWriteShardRequest(buf []byte) error {
 			return nil
 		}
 
-		err = s.TSDBStore.CreateShard(req.Database(), req.RetentionPolicy(), req.ShardID())
+		err = s.TSDBStore.CreateShard(req.Database(), req.RetentionPolicy(), req.ShardID(), true)
 		if err != nil {
 			return fmt.Errorf("create shard %d: %s", req.ShardID(), err)
 		}
@@ -226,12 +234,12 @@ func (s *Service) processWriteShardRequest(buf []byte) error {
 	return nil
 }
 
-func (s *Service) writeShardResponse() {
+func (s *Service) writeShardResponse(conn net.Conn, err error) {
 	// Build response.
-	var resp WriteShardResponse
-	if e != nil {
+	var resp rpc.WriteShardResponse
+	if err != nil {
 		resp.SetCode(1)
-		resp.SetMessage(e.Error())
+		resp.SetMessage(err.Error())
 	} else {
 		resp.SetCode(0)
 	}
@@ -244,7 +252,7 @@ func (s *Service) writeShardResponse() {
 	}
 
 	// Write to connection.
-	if err := WriteTLV(w, writeShardResponseMessage, buf); err != nil {
+	if err := tlv.WriteTLV(conn, tlv.WriteShardResponseMessage, buf); err != nil {
 		s.Logger.Printf("write shard response error: %s", err)
 	}
 }
@@ -258,38 +266,40 @@ func (s *Service) processCreateIteratorRequest(conn net.Conn) {
 	var itr influxql.Iterator
 	if err := func() error {
 		// Parse request.
-		var req CreateIteratorRequest
+		var req rpc.CreateIteratorRequest
 		if err := tlv.DecodeLV(conn, &req); err != nil {
 			return err
 		}
 
 		// Collect iterator creators for each shard.
 		ics := make([]influxql.IteratorCreator, 0, len(req.ShardIDs))
-		for _, shardID := range req.ShardIDs {
-			ic := s.TSDBStore.ShardIteratorCreator(shardID)
-			if ic == nil {
-				return nil
-			}
-			ics = append(ics, ic)
-		}
+		// for _, shardID := range req.ShardIDs {
+		// 	ic := s.ShardIteratorCreator.ShardIteratorCreator(shardID)
+		// 	if ic == nil {
+		// 		return nil
+		// 	}
+		// 	ics = append(ics, ic)
+		// }
 
-		// Generate a single iterator from all shards.
-		i, err := influxql.IteratorCreators(ics).CreateIterator(req.Opt)
-		if err != nil {
-			return err
-		}
-		itr = i
+		// // Generate a single iterator from all shards.
+		// i, err := influxql.IteratorCreators(ics).CreateIterator(req.Opt)
+		// if err != nil {
+		// 	return err
+		// }
+		// itr = i
 
 		return nil
 	}(); err != nil {
 		itr.Close()
 		s.Logger.Printf("error reading CreateIterator request: %s", err)
-		tlv.EncodeTLV(conn, createIteratorResponseMessage, &CreateIteratorResponse{Err: err})
+		// tlv.EncodeTLV(conn, tlv.CreateIteratorResponseMessage, &CreateIteratorResponse{Err: err})
+
+		tlv.EncodeTLV(conn, tlv.CreateIteratorResponseMessage, nil)
 		return
 	}
 
 	// Encode success response.
-	if err := tlv.EncodeTLV(conn, createIteratorResponseMessage, &CreateIteratorResponse{}); err != nil {
+	if err := tlv.EncodeTLV(conn, tlv.CreateIteratorResponseMessage, nil); err != nil {
 		s.Logger.Printf("error writing CreateIterator response: %s", err)
 		return
 	}
@@ -310,37 +320,39 @@ func (s *Service) processFieldDimensionsRequest(conn net.Conn) {
 	var fields, dimensions map[string]struct{}
 	if err := func() error {
 		// Parse request.
-		var req FieldDimensionsRequest
+		var req rpc.FieldDimensionsRequest
 		if err := tlv.DecodeLV(conn, &req); err != nil {
 			return err
 		}
 
 		// Collect iterator creators for each shard.
-		ics := make([]influxql.IteratorCreator, 0, len(req.ShardIDs))
-		for _, shardID := range req.ShardIDs {
-			ic := s.TSDBStore.ShardIteratorCreator(shardID)
-			if ic == nil {
-				return nil
-			}
-			ics = append(ics, ic)
-		}
+		ics := make(influxql.Iterators, 0, len(req.ShardIDs))
+		// for _, shardID := range req.ShardIDs {
+		// 	ic := s.ShardIteratorCreator.ShardIteratorCreator(shardID)
+		// 	if ic == nil {
+		// 		return nil
+		// 	}
+		// 	// ics = append(ics, ic.CreateIterator(nil))
+		// }
 
-		// Generate a single iterator from all shards.
-		f, d, err := influxql.IteratorCreators(ics).FieldDimensions(req.Sources)
-		if err != nil {
-			return err
-		}
-		fields, dimensions = f, d
+		// // Generate a single iterator from all shards.
+		// i, _ := ics.Merge(nil)
+		// f, d, err := influxql.FieldMapper.FieldDimensions(nil)
+		// // f, d, err := influxql.IteratorCreators(ics).FieldDimensions(req.Sources)
+		// if err != nil {
+		// 	return err
+		// }
+		// fields, dimensions = f, d
 
-		return nil
+		// return nil
 	}(); err != nil {
 		s.Logger.Printf("error reading FieldDimensions request: %s", err)
-		tlv.EncodeTLV(conn, fieldDimensionsResponseMessage, &FieldDimensionsResponse{Err: err})
+		tlv.EncodeTLV(conn, tlv.FieldDimensionsResponseMessage, nil)
 		return
 	}
 
 	// Encode success response.
-	if err := tlv.EncodeTLV(conn, fieldDimensionsResponseMessage, &FieldDimensionsResponse{
+	if err := tlv.EncodeTLV(conn, tlv.FieldDimensionsResponseMessage, &rpc.FieldDimensionsResponse{
 		Fields:     fields,
 		Dimensions: dimensions,
 	}); err != nil {
@@ -371,13 +383,14 @@ func (s *Service) processDeleteShardSnapshotRequest() {
 
 }
 
+// ReadTLV drains reader
 func ReadTLV(r io.Reader) (byte, []byte, error) {
-	typ, err := ReadType(r)
+	typ, err := tlv.ReadType(r)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	buf, err := ReadLV(r)
+	buf, err := tlv.ReadLV(r)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -419,9 +432,15 @@ func (s *Service) processShowTagValues() {
 
 }
 
+func (s *Service) processExecuteStatementRequest(buf []byte) error {
+	return nil
+}
+
+// BufferedWriteCloser will
 type BufferedWriteCloser struct {
 }
 
+// Close is actually closing this bufferedwriter
 func (bfc *BufferedWriteCloser) Close() {
 
 }

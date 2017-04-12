@@ -24,30 +24,17 @@ type StatementExecutor struct {
 	StatementExecutor coordinator.StatementExecutor
 }
 
-//
-//
-//
-//
-//
 // ExecuteStatement executes the given statement with the given execution context.
 func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influxql.ExecutionContext) error {
 	switch t := stmt.(type) {
 	case *influxql.ShowQueriesStatement:
-		return e.executeShowQueriesStatement(stmt)
+		return e.executeShowQueriesStatement(t)
 	case *influxql.KillQueryStatement:
-		return e.executeKillQueryStatement(stmt)
+		return e.executeKillQueryStatement(t)
 	}
 	return e.StatementExecutor.ExecuteStatement(stmt, ctx)
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
 func (e *StatementExecutor) executeShowQueriesStatement(stmt *influxql.ShowQueriesStatement) error {
 	dataNodes, err := e.MetaClient.DataNodes()
 	if err != nil {
@@ -69,12 +56,12 @@ func (e *StatementExecutor) executeShowQueriesStatement(stmt *influxql.ShowQueri
 			}
 
 			res := rpc.ExecuteStatementResponse{}
-			if _, err := tlv.DecodeTLV(conn, tlv.ExecuteStatementResponseMessage, &res); err != nil {
+			if _, err := tlv.DecodeTLV(conn, &res); err != nil {
 				return fmt.Errorf("failed to decode tlv: %v", err)
 			} else if res.Code() != 200 {
 				return fmt.Errorf("response status is not correct")
 			}
-
+			return nil
 		}(data)
 	}
 	return nil
