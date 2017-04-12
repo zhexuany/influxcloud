@@ -25,7 +25,7 @@ type StatementExecutor struct {
 }
 
 // ExecuteStatement executes the given statement with the given execution context.
-func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx *influxql.ExecutionContext) error {
+func (e *StatementExecutor) ExecuteStatement(stmt influxql.Statement, ctx influxql.ExecutionContext) error {
 	switch t := stmt.(type) {
 	case *influxql.ShowQueriesStatement:
 		return e.executeShowQueriesStatement(t)
