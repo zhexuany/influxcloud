@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"strconv"
-	"strings"
 	"sync"
 )
 
@@ -19,7 +18,7 @@ func (t *Tracker) Remove(task string) {
 }
 
 func (t *Tracker) Tasks() []string {
-
+	return nil
 }
 
 func (t *Tracker) Task() {

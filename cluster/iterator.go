@@ -33,11 +33,11 @@ func (ric *remoteIteratorCreator) nodeIDs() uint64Slice {
 	return ids
 }
 
-func (ric *remoteIteratorCreator) nodeIteratorCreators() influxql.IteratorCreators {
-	shardIDs := ric.shardIDs()
-	nodeIDS := ric.nodeIDs()
-	return nil
-}
+// func (ric *remoteIteratorCreator) nodeIteratorCreators() influxql.IteratorCreators {
+// 	shardIDs := ric.shardIDs()
+// 	nodeIDS := ric.nodeIDs()
+// 	return nil
+// }
 
 //
 func (ric *remoteIteratorCreator) createIterators(stmt *influxql.SelectStatement, ctx *influxql.ExecutionContext) (influxql.Iterators, *influxql.SelectStatement, error) {
@@ -144,7 +144,6 @@ func (nd *NodeDialer) DialNode(id uint64) (net.Conn, error) {
 		return nil, err
 	}
 	//
-	now := time.Now()
 	return conn, nil
 }
 

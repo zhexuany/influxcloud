@@ -216,9 +216,9 @@ func (m *MetaExecutor) DeleteRetentionPolicy(stmt influxql.Statement) error {
 
 func (m *MetaExecutor) DeleteSeries(stmt influxql.Statement) error {
 	db := ""
-	if st, ok := stmt.(*influxql.DropSeriesStatement); ok {
+	// if st, ok := stmt.(*influxql.DropSeriesStatement); ok {
 
-	}
+	// }
 	return m.ExecuteStatement(stmt, db)
 }
 
@@ -236,18 +236,6 @@ func (m *MetaExecutor) RestoreShard(id uint64, r io.Reader) error {
 }
 
 func (m *MetaExecutor) IteratorCreator(opt influxql.IteratorOptions) influxql.IteratorCreator {
-	//
-	ic := remoteIteratorCreator{}
-	//
-	//
-	//
-	//
-	//
-	//
-	//
-
-	//
-	//
 	return nil
 }
 

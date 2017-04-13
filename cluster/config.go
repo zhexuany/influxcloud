@@ -63,9 +63,9 @@ type Config struct {
 // NewConfig returns an instance of Config with defaults.
 func NewConfig() Config {
 	return Config{
-		DialTimeout:               toml.Duration(DefaultDialTimeout),
-		ShardWriterTimeout:        toml.Duration(DefaultShardWriterTimeout),
-		ShardReaderTimeout:        toml.Duration(DefaultShardreaderTimeout),
+		DialTimeout:        toml.Duration(DefaultDialTimeout),
+		ShardWriterTimeout: toml.Duration(DefaultShardWriterTimeout),
+		// ShardReaderTimeout:        toml.Duration(DefaultShardreaderTimeout),
 		MaxRemoteWriteConnections: DefaultMaxRemoteWriteConnections,
 		ClusterTracing:            DefaultClusterTracing,
 		WriteTimeout:              toml.Duration(DefaultWriteTimeout),

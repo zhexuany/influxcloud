@@ -182,17 +182,16 @@ func (s *Service) handleConn(conn net.Conn) {
 func (s *Service) executeStatement(stmt influxql.Statement, database string) error {
 	switch t := stmt.(type) {
 	case *influxql.DropDatabaseStatement:
-		// return s.TSDBStore.DeleteDatabase(t.Name)
+		return s.TSDBStore.DeleteDatabase(t.Name)
 	case *influxql.DropMeasurementStatement:
-		// return s.TSDBStore.DeleteMeasurement(database, t.Name)
+		return s.TSDBStore.DeleteMeasurement(database, t.Name)
 	case *influxql.DropSeriesStatement:
-		// return s.TSDBStore.DeleteSeries(database, t.Sources, t.Condition)
+		return s.TSDBStore.DeleteSeries(database, t.Sources, t.Condition)
 	case *influxql.DropRetentionPolicyStatement:
-		// return s.TSDBStore.DeleteRetentionPolicy(database, t.Name)
+		return s.TSDBStore.DeleteRetentionPolicy(database, t.Name)
 	default:
 		return fmt.Errorf("%q should not be executed across a cluster", stmt.String())
 	}
-	return nil
 }
 func (s *Service) processWriteShardRequest(buf []byte) error {
 	// Build request
@@ -272,7 +271,7 @@ func (s *Service) processCreateIteratorRequest(conn net.Conn) {
 		}
 
 		// Collect iterator creators for each shard.
-		ics := make([]influxql.IteratorCreator, 0, len(req.ShardIDs))
+		// ics := make([]influxql.IteratorCreator, 0, len(req.ShardIDs))
 		// for _, shardID := range req.ShardIDs {
 		// 	ic := s.ShardIteratorCreator.ShardIteratorCreator(shardID)
 		// 	if ic == nil {
@@ -326,7 +325,7 @@ func (s *Service) processFieldDimensionsRequest(conn net.Conn) {
 		}
 
 		// Collect iterator creators for each shard.
-		ics := make(influxql.Iterators, 0, len(req.ShardIDs))
+		// ics := make(influxql.Iterators, 0, len(req.ShardIDs))
 		// for _, shardID := range req.ShardIDs {
 		// 	ic := s.ShardIteratorCreator.ShardIteratorCreator(shardID)
 		// 	if ic == nil {
@@ -344,7 +343,7 @@ func (s *Service) processFieldDimensionsRequest(conn net.Conn) {
 		// }
 		// fields, dimensions = f, d
 
-		// return nil
+		return nil
 	}(); err != nil {
 		s.Logger.Printf("error reading FieldDimensions request: %s", err)
 		tlv.EncodeTLV(conn, tlv.FieldDimensionsResponseMessage, nil)
