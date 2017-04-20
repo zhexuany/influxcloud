@@ -1,4 +1,4 @@
-PACKAGES=$(shell find . -name '*.go' -print0 | xargs -0 -n1 dirname | sort --unique)
+PACKAGES=$(find . -name '*.go' | grep -vE 'vendor')
 
 default:
 
@@ -28,8 +28,11 @@ errcheck:
 	  errcheck -ignorepkg=bytes,fmt -ignore=":(Rollback|Close)" $$pkg \
 	done
 
-get-dep:
-	govendor install +locall,^program
+update:
+				which glide >/dev/null || curl https://glide.sh/get | sh
+				which glide-vc >/dev/null || go get -v -u github.com/sgotti/glide-vc
+				@echo "removing test files"
+				glide vc --only-code --no-tests
 
 tools:
 	go get github.com/remyoudompheng/go-misc/deadcode
