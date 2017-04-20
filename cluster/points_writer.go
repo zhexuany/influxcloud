@@ -344,14 +344,6 @@ func (w *PointsWriter) WritePoints(database, retentionPolicy string, consistency
 	return nil
 }
 
-//
-//
-//
-//
-//
-//
-//
-//
 // writeToShards writes points to a shard.
 func (w *PointsWriter) writeToShard(shard *meta.ShardInfo, database, retentionPolicy string,
 	consistency models.ConsistencyLevel, points []models.Point) error {
@@ -365,8 +357,6 @@ func (w *PointsWriter) writeToShard(shard *meta.ShardInfo, database, retentionPo
 
 	// AsyncWriteResult is a struct that can be used
 	// to determine the status of each PointWriteRequest
-	//
-	//
 	type AsyncWriteResult struct {
 		Owner meta.ShardOwner
 		Err   error
