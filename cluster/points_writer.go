@@ -41,6 +41,7 @@ type PointsWriter struct {
 	MetaClient interface {
 		Database(name string) (di *meta.DatabaseInfo)
 		RetentionPolicy(database, policy string) (*meta.RetentionPolicyInfo, error)
+		CreateShardGroup(database, policy string, timestamp time.Time) (*meta.ShardGroupInfo, error)
 		ShardOwner(shardID uint64) (string, string, *meta.ShardGroupInfo)
 	}
 
@@ -166,11 +167,11 @@ func (w *PointsWriter) MapShards(wp *WritePointsRequest) (*ShardMapping, error) 
 	list := new(sgList)
 	for _, p := range wp.Points {
 		if !list.Covers(p.Time()) {
-			// sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, p.Time())
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// list = list.Add(*sg)
+			sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, p.Time())
+			if err != nil {
+				return nil, err
+			}
+			list = list.Add(*sg)
 		}
 	}
 
