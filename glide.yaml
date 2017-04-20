@@ -1,0 +1,65 @@
+package: github.com/influxCloud/influxcloud
+import:
+- package: github.com/BurntSushi/toml
+  version: v0.3.0
+- package: github.com/gogo/protobuf
+  version: v0.4
+  subpackages:
+  - proto
+- package: github.com/hashicorp/raft
+- package: github.com/hashicorp/raft-boltdb
+- package: github.com/influxdata/influxdb
+  version: v1.2.3
+  subpackages:
+  - cmd
+  - cmd/influxd/backup
+  - cmd/influxd/help
+  - cmd/influxd/restore
+  - cmd/influxd/run
+  - coordinator
+  - influxql
+  - models
+  - monitor
+  - monitor/diagnostics
+  - services/admin
+  - services/collectd
+  - services/continuous_querier
+  - services/graphite
+  - services/httpd
+  - services/meta
+  - services/opentsdb
+  - services/precreator
+  - services/retention
+  - services/snapshotter
+  - services/subscriber
+  - services/udp
+  - tcp
+  - toml
+  - tsdb
+  - tsdb/engine
+  - uuid
+- package: github.com/influxdata/usage-client
+  subpackages:
+  - v1
+- package: github.com/uber-go/zap
+  version: v1.2.0
+- package: github.com/zhexuany/influxcloud
+  subpackages:
+  - cmd/influxd-meta/run
+  - meta
+  - meta/internal
+  - rpc
+  - rpc/internal
+  - tlv
+- package: github.com/zhexuany/influxdb-cluster
+  subpackages:
+  - meta
+- package: golang.org/x/crypto
+  subpackages:
+  - bcrypt
+- package: gopkg.in/fatih/pool.v2
+testImport:
+- package: github.com/davecgh/go-spew
+  version: v1.1.0
+  subpackages:
+  - spew

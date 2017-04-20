@@ -1,4 +1,4 @@
-package influxCloud
+package influxcloud
 
 import (
 	"errors"

@@ -8,8 +8,8 @@ import (
 
 const (
 	nodeFile      = "node.json"
-	oldNodeFile   = "id"
-	peersFilename = "peers.json"
+//	oldNodeFile   = "id"
+//	peersFilename = "peers.json"
 )
 
 type Node struct {

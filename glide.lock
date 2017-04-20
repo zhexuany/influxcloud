@@ -1,0 +1,135 @@
+hash: ee7648835ebd1d034f85c5a0f91d1e28dac0479b85adeeecddcae5701e0d37f7
+updated: 2017-04-20T13:15:29.525912391+08:00
+imports:
+- name: collectd.org
+  version: e84e8af5356e7f47485bbc95c96da6dd7984a67e
+  subpackages:
+  - api
+  - cdtime
+  - network
+- name: github.com/armon/go-metrics
+  version: 345426c77237ece5dab0e1605c3e4b35c3f54757
+- name: github.com/bmizerany/pat
+  version: c068ca2f0aacee5ac3681d68e4d0a003b7d1fd2c
+- name: github.com/boltdb/bolt
+  version: 4b1ebc1869ad66568b313d0dc410e2be72670dda
+- name: github.com/BurntSushi/toml
+  version: b26d9c308763d68093482582cea63d69be07a0f0
+- name: github.com/cespare/xxhash
+  version: 4a94f899c20bc44d4f5f807cb14529e72aca99d6
+- name: github.com/dgrijalva/jwt-go
+  version: 24c63f56522a87ec5339cc3567883f1039378fdb
+- name: github.com/dgryski/go-bits
+  version: 2ad8d707cc05b1815ce6ff2543bb5e8d8f9298ef
+- name: github.com/dgryski/go-bitstream
+  version: 7d46cd22db7004f0cceb6f7975824b560cf0e486
+- name: github.com/gogo/protobuf
+  version: 100ba4e885062801d56799d78530b73b178a78f3
+  subpackages:
+  - proto
+- name: github.com/golang/snappy
+  version: d9eb7a3d35ec988b8585d4a0068e462c27d28380
+- name: github.com/hashicorp/go-msgpack
+  version: fa3f63826f7c23912c15263591e65d54d080b458
+  subpackages:
+  - codec
+- name: github.com/hashicorp/raft
+  version: 8fd9a2fdfd154f4b393aa24cff91e3c317efe839
+- name: github.com/hashicorp/raft-boltdb
+  version: d1e82c1ec3f15ee991f7cc7ffd5b67ff6f5bbaee
+- name: github.com/influxdata/influxdb
+  version: 74aa2aa9ae830cd11b8e975e85bb60e61d8d1f21
+  subpackages:
+  - client/v2
+  - cluster
+  - cmd
+  - cmd/influxd/backup
+  - cmd/influxd/help
+  - cmd/influxd/restore
+  - cmd/influxd/run
+  - coordinator
+  - influxql
+  - influxql/internal
+  - influxql/neldermead
+  - models
+  - monitor
+  - monitor/diagnostics
+  - pkg/escape
+  - pkg/limiter
+  - pkg/pool
+  - services/admin
+  - services/admin/statik
+  - services/collectd
+  - services/continuous_querier
+  - services/graphite
+  - services/httpd
+  - services/meta
+  - services/meta/internal
+  - services/opentsdb
+  - services/precreator
+  - services/retention
+  - services/snapshotter
+  - services/subscriber
+  - services/udp
+  - tcp
+  - toml
+  - tsdb
+  - tsdb/engine
+  - tsdb/engine/tsm1
+  - tsdb/internal
+  - uuid
+- name: github.com/influxdata/usage-client
+  version: 6d3895376368aa52a3a81d2a16e90f0f52371967
+  subpackages:
+  - v1
+- name: github.com/jwilder/encoding
+  version: 4dada27c33277820fe35c7ee71ed34fbc9477d00
+  subpackages:
+  - simple8b
+- name: github.com/rakyll/statik
+  version: e383bbf6b2ec1a2fb8492dfd152d945fb88919b6
+  subpackages:
+  - fs
+- name: github.com/uber-go/zap
+  version: 1550bc05539134bbf8612a35f34a79ab8bf34ee3
+- name: github.com/zhexuany/influxcloud
+  version: 41aa2f23841c6dbaea7bbf40150feec2fc70afe0
+  subpackages:
+  - cmd/influxd-meta/run
+  - meta
+  - meta/internal
+  - rpc
+  - rpc/internal
+  - tlv
+- name: github.com/zhexuany/influxdb-cluster
+  version: 41aa2f23841c6dbaea7bbf40150feec2fc70afe0
+  subpackages:
+  - hh
+  - meta
+- name: go.uber.org/atomic
+  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
+- name: go.uber.org/zap
+  version: 1550bc05539134bbf8612a35f34a79ab8bf34ee3
+  subpackages:
+  - buffer
+  - internal/bufferpool
+  - internal/color
+  - internal/exit
+  - internal/multierror
+  - zapcore
+- name: golang.org/x/crypto
+  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
+  subpackages:
+  - bcrypt
+  - blowfish
+- name: golang.org/x/sys
+  version: f3918c30c5c2cb527c0b071a27c35120a6c0719a
+  subpackages:
+  - unix
+- name: gopkg.in/fatih/pool.v2
+  version: cba550ebf9bce999a02e963296d4bc7a486cb715
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
+  subpackages:
+  - spew
