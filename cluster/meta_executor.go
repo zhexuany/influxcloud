@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/zhexuany/influxdb-cluster/rpc"
 	"github.com/zhexuany/influxdb-cluster/tlv"
-	"io"
 )
 
 const (
@@ -66,9 +66,6 @@ func NewMetaExecutor() *MetaExecutor {
 
 	return m
 }
-
-//
-//
 
 // remoteNodeError wraps an error with context about a node that
 // returned the error.
