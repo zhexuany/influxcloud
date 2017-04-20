@@ -1,4 +1,4 @@
-# influxdb-cluster
+# influxCloud
 
 ## What is this prototype can do? 
 - edit meta node including adding, updating and deleting 

@@ -2,23 +2,23 @@ package meta_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path"
 	"reflect"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
-	"fmt"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tcp"
 	"github.com/influxdata/influxdb/toml"
-	influxdb_cluster "github.com/zhexuany/influxdb-cluster"
-	cluster_meta "github.com/zhexuany/influxdb-cluster/meta"
-	"sync"
+	"github.com/zhexuany/influxcloud"
+	cloudMeta "github.com/zhexuany/influxcloud/meta"
 )
 
 func TestMetaService_CreateDatabase(t *testing.T) {
@@ -443,14 +443,14 @@ func TestMetaService_Subscriptions_Drop(t *testing.T) {
 	// DROP SUBSCRIPTION returns an influxdb.ErrDatabaseNotFound when
 	// the database is unknown.
 	err = c.DropSubscription("foo", "default", "sub0")
-	if got, exp := err, influxdb_cluster.ErrDatabaseNotFound("foo"); got.Error() != exp.Error() {
+	if got, exp := err, influxcloud.ErrDatabaseNotFound("foo"); got.Error() != exp.Error() {
 		t.Fatalf("got: %s, exp: %s", got, exp)
 	}
 
 	// DROP SUBSCRIPTION returns an influxdb.ErrRetentionPolicyNotFound
 	// when the retention policy is unknown.
 	err = c.DropSubscription("db0", "foo_policy", "sub0")
-	if got, exp := err, influxdb_cluster.ErrRetentionPolicyNotFound("foo_policy"); got.Error() != exp.Error() {
+	if got, exp := err, influxcloud.ErrRetentionPolicyNotFound("foo_policy"); got.Error() != exp.Error() {
 		t.Fatalf("got: %s, exp: %s", got, exp)
 	}
 
@@ -579,7 +579,7 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 	}
 	defer s3.Close()
 
-	c1 := cluster_meta.NewClient(cfg3)
+	c1 := cloudMeta.NewClient(cfg3)
 	c1.SetMetaServers(joinPeers[0:3])
 	if err := c1.Open(); err != nil {
 		t.Fatal(err)
@@ -591,7 +591,7 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 		t.Fatalf("meta nodes wrong: %v", metaNodes)
 	}
 
-	c := cluster_meta.NewClient(cfg1)
+	c := cloudMeta.NewClient(cfg1)
 	c.SetMetaServers([]string{s1.HTTPAddr()})
 	if err := c.Open(); err != nil {
 		t.Fatal(err)
@@ -618,7 +618,7 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 	}
 	defer s4.Close()
 
-	c2 := cluster_meta.NewClient(cfg4)
+	c2 := cloudMeta.NewClient(cfg4)
 	c2.SetMetaServers(cfg4.JoinPeers)
 	if err := c2.Open(); err != nil {
 		t.Fatal(err)
@@ -636,7 +636,7 @@ func TestMetaService_CreateRemoveMetaNode(t *testing.T) {
 // hits the leader and finishes the command
 func TestMetaService_CommandAgainstNonLeader(t *testing.T) {
 	t.Parallel()
-	cfgs := make([]*cluster_meta.Config, 3)
+	cfgs := make([]*cloudMeta.Config, 3)
 	srvs := make([]*testService, 3)
 	joinPeers := freePorts(len(cfgs))
 
@@ -662,7 +662,7 @@ func TestMetaService_CommandAgainstNonLeader(t *testing.T) {
 	wg.Wait()
 
 	for i := range cfgs {
-		c := cluster_meta.NewClient(cfgs[i])
+		c := cloudMeta.NewClient(cfgs[i])
 		c.SetMetaServers([]string{joinPeers[i]})
 		if err := c.Open(); err != nil {
 			t.Fatal(err)
@@ -689,7 +689,7 @@ func TestMetaService_CommandAgainstNonLeader(t *testing.T) {
 func TestMetaService_FailureAndRestartCluster(t *testing.T) {
 	t.Parallel()
 
-	cfgs := make([]*cluster_meta.Config, 3)
+	cfgs := make([]*cloudMeta.Config, 3)
 	srvs := make([]*testService, 3)
 	joinPeers := freePorts(len(cfgs))
 	raftPeers := freePorts(len(cfgs))
@@ -717,7 +717,7 @@ func TestMetaService_FailureAndRestartCluster(t *testing.T) {
 	}
 	swg.Wait()
 
-	c := cluster_meta.NewClient(cfgs[0])
+	c := cloudMeta.NewClient(cfgs[0])
 	c.SetMetaServers(joinPeers)
 	if err := c.Open(); err != nil {
 		t.Fatal(err)
@@ -776,7 +776,7 @@ func TestMetaService_FailureAndRestartCluster(t *testing.T) {
 	wg.Wait()
 	time.Sleep(time.Second)
 
-	c2 := cluster_meta.NewClient(cfgs[0])
+	c2 := cloudMeta.NewClient(cfgs[0])
 	c2.SetMetaServers(joinPeers)
 	if err := c2.Open(); err != nil {
 		t.Fatal(err)
@@ -817,7 +817,7 @@ func TestMetaService_CreateDataNode(t *testing.T) {
 	defer s.Close()
 	defer c.Close()
 
-	exp := &cluster_meta.NodeInfo{
+	exp := &cloudMeta.NodeInfo{
 		ID:      1,
 		Host:    "foo:8180",
 		TCPHost: "bar:8281",
@@ -837,7 +837,7 @@ func TestMetaService_CreateDataNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(nodes, cluster_meta.NodeInfos{*exp}) {
+	if !reflect.DeepEqual(nodes, cloudMeta.NodeInfos{*exp}) {
 		t.Fatalf("nodes wrong: %v", nodes)
 	}
 }
@@ -852,9 +852,9 @@ func TestMetaService_DropDataNode(t *testing.T) {
 
 	// Dropping a data node with an invalid ID returns an error
 	if err := c.DeleteDataNode(0); err == nil {
-		t.Fatalf("Didn't get an error but expected %s", cluster_meta.ErrNodeNotFound)
-	} else if err.Error() != cluster_meta.ErrNodeNotFound.Error() {
-		t.Fatalf("got %v, expected %v", err, cluster_meta.ErrNodeNotFound)
+		t.Fatalf("Didn't get an error but expected %s", cloudMeta.ErrNodeNotFound)
+	} else if err.Error() != cloudMeta.ErrNodeNotFound.Error() {
+		t.Fatalf("got %v, expected %v", err, cloudMeta.ErrNodeNotFound)
 	}
 
 	// Create a couple of nodes.
@@ -1016,7 +1016,7 @@ func TestMetaService_PersistClusterIDAfterRestart(t *testing.T) {
 
 func TestMetaService_Ping(t *testing.T) {
 	t.Parallel()
-	cfgs := make([]*cluster_meta.Config, 3)
+	cfgs := make([]*cloudMeta.Config, 3)
 	srvs := make([]*testService, 3)
 	joinPeers := freePorts(len(cfgs))
 
@@ -1042,7 +1042,7 @@ func TestMetaService_Ping(t *testing.T) {
 	swg.Wait()
 
 	cfg := cfgs[0]
-	c := cluster_meta.NewClient(cfg)
+	c := cloudMeta.NewClient(cfg)
 	c.SetMetaServers(joinPeers)
 	if err := c.Open(); err != nil {
 		t.Fatal(err)
@@ -1127,7 +1127,7 @@ func TestMetaService_AcquireLease(t *testing.T) {
 
 // newServiceAndClient returns new data directory, *Service, and *Client or panics.
 // Caller is responsible for deleting data dir and closing client.
-func newServiceAndClient() (string, *testService, *cluster_meta.Client) {
+func newServiceAndClient() (string, *testService, *cloudMeta.Client) {
 	cfg := newConfig()
 	s := newService(cfg)
 	if err := s.Open(); err != nil {
@@ -1140,9 +1140,9 @@ func newServiceAndClient() (string, *testService, *cluster_meta.Client) {
 }
 
 // newClient will create a meta client and also open it
-func newClient(s *testService) *cluster_meta.Client {
+func newClient(s *testService) *cloudMeta.Client {
 	cfg := newConfig()
-	c := cluster_meta.NewClient(cfg)
+	c := cloudMeta.NewClient(cfg)
 	c.SetMetaServers([]string{s.HTTPAddr()})
 	if err := c.Open(); err != nil {
 		panic(err)
@@ -1150,8 +1150,8 @@ func newClient(s *testService) *cluster_meta.Client {
 	return c
 }
 
-func newConfig() *cluster_meta.Config {
-	cfg := cluster_meta.NewConfig()
+func newConfig() *cloudMeta.Config {
+	cfg := cloudMeta.NewConfig()
 	cfg.BindAddress = "127.0.0.1:0"
 	cfg.HTTPBindAddress = "127.0.0.1:0"
 	cfg.Dir = testTempDir(2)
@@ -1175,7 +1175,7 @@ func testTempDir(skip int) string {
 }
 
 type testService struct {
-	*cluster_meta.Service
+	*cloudMeta.Service
 	ln net.Listener
 }
 
@@ -1186,7 +1186,7 @@ func (t *testService) Close() error {
 	return t.ln.Close()
 }
 
-func newService(cfg *cluster_meta.Config) *testService {
+func newService(cfg *cloudMeta.Config) *testService {
 	// Open shared TCP connection.
 	ln, err := net.Listen("tcp", cfg.BindAddress)
 	if err != nil {
@@ -1199,9 +1199,9 @@ func newService(cfg *cluster_meta.Config) *testService {
 	if err != nil {
 		panic(err)
 	}
-	s := cluster_meta.NewService(cfg)
-	s.Node = influxdb_cluster.NewNode(cfg.Dir)
-	s.RaftListener = mux.Listen(cluster_meta.MuxHeader)
+	s := cloudMeta.NewService(cfg)
+	s.Node = influxcloud.NewNode(cfg.Dir)
+	s.RaftListener = mux.Listen(cloudMeta.MuxHeader)
 
 	go mux.Serve(ln)
 

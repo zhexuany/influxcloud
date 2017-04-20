@@ -6,8 +6,8 @@ import (
 
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/zhexuany/influxdb-cluster/rpc"
-	"github.com/zhexuany/influxdb-cluster/tlv"
+	"github.com/zhexuany/influxcloud/rpc"
+	"github.com/zhexuany/influxcloud/tlv"
 	"sort"
 )
 

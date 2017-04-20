@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/BurntSushi/toml"
-	"github.com/zhexuany/influxdb-cluster/meta"
+	"github.com/zhexuany/influxcloud/meta"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
-	"github.com/zhexuany/influxdb-cluster/meta"
+	"github.com/zhexuany/influxcloud/meta"
 )
 
 // PrintConfigCommand represents the command executed by "influxd config".

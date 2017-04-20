@@ -14,8 +14,8 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
-	"github.com/zhexuany/influxdb-cluster/rpc"
-	"github.com/zhexuany/influxdb-cluster/tlv"
+	"github.com/zhexuany/influxcloud/rpc"
+	"github.com/zhexuany/influxcloud/tlv"
 )
 
 const (

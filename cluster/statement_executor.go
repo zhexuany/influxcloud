@@ -2,13 +2,14 @@ package cluster
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/zhexuany/influxdb-cluster/rpc"
-	"github.com/zhexuany/influxdb-cluster/tlv"
-	"net"
-	"time"
+	"github.com/zhexuany/influxcloud/rpc"
+	"github.com/zhexuany/influxcloud/tlv"
 )
 
 // StatementExecutor executes a statement in the query.

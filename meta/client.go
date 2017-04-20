@@ -19,7 +19,7 @@ import (
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/zhexuany/influxdb-cluster/meta/internal"
+	"github.com/zhexuany/influxcloud/meta/internal"
 
 	"github.com/gogo/protobuf/proto"
 	"path/filepath"

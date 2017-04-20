@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/cmd"
-	"github.com/zhexuany/influxdb-cluster/cmd/influxd-meta/run"
+	"github.com/zhexuany/influxcloud/cmd/influxd-meta/run"
 )
 
 // These variables are populated via the Go linker.

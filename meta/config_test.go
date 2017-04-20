@@ -6,7 +6,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/zhexuany/influxdb-cluster/meta"
+	"github.com/zhexuany/influxcloud/meta"
 )
 
 func TestConfig_Parse(t *testing.T) {

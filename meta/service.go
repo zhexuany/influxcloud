@@ -1,4 +1,4 @@
-package meta // import "github.com/zhexuany/influxdb-cluster/meta"
+package meta // import "github.com/zhexuany/influxcloud/meta"
 
 import (
 	"crypto/tls"
@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zhexuany/influxdb-cluster"
+	"github.com/zhexuany/influxcloud"
 )
 
 var mutex sync.RWMutex

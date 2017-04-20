@@ -1,4 +1,4 @@
-package influxdb_cluster
+package influxcloud
 
 import (
 	"encoding/json"

@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/zhexuany/influxdb-cluster/meta/internal"
+	"github.com/zhexuany/influxcloud/meta/internal"
 )
 
 // storeFSM represents the finite state machine used by Store to interact with Raft.

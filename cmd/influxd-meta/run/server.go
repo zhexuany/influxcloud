@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/tcp"
-	influxdb_cluster "github.com/zhexuany/influxdb-cluster"
-	"github.com/zhexuany/influxdb-cluster/meta"
+	"github.com/zhexuany/influxcloud"
+	"github.com/zhexuany/influxcloud/meta"
 )
 
 var startTime time.Time
@@ -88,7 +88,7 @@ func NewServer(c *meta.Config, buildInfo *BuildInfo) (*Server, error) {
 	// check file is existed or not
 	if _, err := os.Stat(path); err == nil {
 		// load node from node.json and check the error
-		node, err := influxdb_cluster.LoadNode(c.Dir)
+		node, err := influxcloud.LoadNode(c.Dir)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, err

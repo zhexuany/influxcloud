@@ -8,8 +8,8 @@ import (
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/zhexuany/influxdb-cluster/rpc"
-	"github.com/zhexuany/influxdb-cluster/tlv"
+	"github.com/zhexuany/influxcloud/rpc"
+	"github.com/zhexuany/influxcloud/tlv"
 )
 
 // ShardWriter writes a set of points to a shard.
