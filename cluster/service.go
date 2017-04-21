@@ -193,6 +193,7 @@ func (s *Service) executeStatement(stmt influxql.Statement, database string) err
 		return fmt.Errorf("%q should not be executed across a cluster", stmt.String())
 	}
 }
+
 func (s *Service) processWriteShardRequest(buf []byte) error {
 	// Build request
 	var req rpc.WriteShardRequest

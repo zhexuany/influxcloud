@@ -3,9 +3,7 @@ package cluster
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/zhexuany/influxcloud/rpc"
 	"github.com/zhexuany/influxcloud/tlv"
+	"go.uber.org/zap"
 )
 
 const (
@@ -29,7 +28,7 @@ type MetaExecutor struct {
 	timeout        time.Duration
 	pool           *clientPool
 	maxConnections int
-	Logger         *log.Logger
+	Logger         zap.Logger
 	Node           *influxdb.Node
 
 	nodeExecutor interface {
@@ -60,7 +59,7 @@ func NewMetaExecutor() *MetaExecutor {
 		timeout:        metaExecutorWriteTimeout,
 		pool:           newClientPool(),
 		maxConnections: metaExecutorMaxWriteConnections,
-		Logger:         log.New(os.Stderr, "[meta-executor] ", log.LstdFlags),
+		Logger:         zap.New(zap.NullEncoder()),
 	}
 	m.nodeExecutor = m
 
@@ -185,24 +184,29 @@ func (m *MetaExecutor) dial(nodeID uint64) (net.Conn, error) {
 	return m.pool.conn(nodeID)
 }
 
+// CreateShard will create Shard on serveral data nodes
 func (m *MetaExecutor) CreateShard(db, policy string, shardID uint64, enabled bool) error {
 	return m.TSDBStore.CreateShard(db, policy, shardID, enabled)
 }
 
+// WriteToShard will write points into shard accoridng to shardID and ownerID
 func (m *MetaExecutor) WriteToShard(shardID, ownerID uint64, points []models.Point) error {
 	return m.ShardWriter.WriteShard(shardID, ownerID, points)
 }
 
+// DeleteDatabase will remove a database from cluster
 func (m *MetaExecutor) DeleteDatabase(stmt influxql.Statement) error {
 	db := ""
 	return m.ExecuteStatement(stmt, db)
 }
 
+// DeleteMeasurement removes measurement from cluster
 func (m *MetaExecutor) DeleteMeasurement(stmt influxql.Statement) error {
 	db := ""
 	return m.ExecuteStatement(stmt, db)
 }
 
+// DeleteRetentionPolicy removes RetentionPolicy from cluster
 func (m *MetaExecutor) DeleteRetentionPolicy(stmt influxql.Statement) error {
 	db := ""
 	if st, ok := stmt.(*influxql.DropRetentionPolicyStatement); ok {
@@ -211,6 +215,7 @@ func (m *MetaExecutor) DeleteRetentionPolicy(stmt influxql.Statement) error {
 	return m.ExecuteStatement(stmt, db)
 }
 
+// DeleteSeries removes series data from cluster
 func (m *MetaExecutor) DeleteSeries(stmt influxql.Statement) error {
 	db := ""
 	// if st, ok := stmt.(*influxql.DropSeriesStatement); ok {
@@ -219,30 +224,36 @@ func (m *MetaExecutor) DeleteSeries(stmt influxql.Statement) error {
 	return m.ExecuteStatement(stmt, db)
 }
 
+// DeleteShard removes a Shard from cluster
 func (m *MetaExecutor) DeleteShard(stmt influxql.Statement) error {
 	db := ""
 	return m.ExecuteStatement(stmt, db)
 }
 
+// BackupShard backup a shard in cluster
 func (m *MetaExecutor) BackupShard(id uint64, since time.Time, w io.Writer) error {
 	return m.TSDBStore.BackupShard(id, since, w)
 }
 
+// RestoreShard restore a shard in cluster
 func (m *MetaExecutor) RestoreShard(id uint64, r io.Reader) error {
 	return m.TSDBStore.RestoreShard(id, r)
 }
 
+// IteratorCreator return a IteratorCreator according IteratorOptions
 func (m *MetaExecutor) IteratorCreator(opt influxql.IteratorOptions) influxql.IteratorCreator {
 	return nil
 }
 
+// Measurements return a all measurements in cluster
 func (m *MetaExecutor) Measurements() []string {
 	return nil
 }
 
-func (m *MetaExecutor) TagValues() {
-
+// TagValues return a Tag Values according db and condition
+func (m *MetaExecutor) TagValues(database string, cond influxql.Expr) ([]tsdb.TagValues, error) {
+	return m.TSDBStore.TagValues(database, cond)
 }
 
-func (m *MetaExecutor) MetaIteratorCreator() {
-}
+// func (m *MetaExecutor) MetaIteratorCreator() {
+// }

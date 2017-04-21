@@ -2,12 +2,10 @@ package cluster
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
-	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/zhexuany/influxcloud/rpc"
 	"github.com/zhexuany/influxcloud/tlv"
@@ -99,4 +97,5 @@ func (e *StatementExecutor) executeKillQueryStatement(stmt *influxql.KillQuerySt
 			return nil
 		}(data)
 	}
+	return nil
 }
