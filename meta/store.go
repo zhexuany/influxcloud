@@ -50,7 +50,7 @@ type store struct {
 	raftAddr string
 	httpAddr string
 
-	node *influxdb_cluster.Node
+	node *influxcloud.Node
 
 	raftLn net.Listener
 }

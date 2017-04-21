@@ -37,7 +37,7 @@ type Service struct {
 	Logger   *log.Logger
 	store    *store
 
-	Node *influxdb_cluster.Node
+	Node *influxcloud.Node
 }
 
 // NewService returns a new instance of Service.

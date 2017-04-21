@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/models"
-	"github.com/zhexuany/influxdb-cluster/meta"
+	"github.com/zhexuany/influxcloud/meta"
 	"sync/atomic"
 )
 

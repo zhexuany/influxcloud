@@ -29,6 +29,9 @@ import (
 	"github.com/influxdata/influxdb/services/subscriber"
 	"github.com/influxdata/influxdb/services/udp"
 	"github.com/influxdata/influxdb/tsdb"
+	"github.com/zhexuany/influxcloud/cluster"
+	"github.com/zhexuany/influxcloud/hh"
+	"github.com/zhexuany/influxdb-cluster/hh"
 )
 
 const (
@@ -40,6 +43,7 @@ const (
 type Config struct {
 	Meta        *meta.Config       `toml:"meta"`
 	Data        tsdb.Config        `toml:"data"`
+	Cluster     cluster.Config     `toml:"cluster"`
 	Coordinator coordinator.Config `toml:"coordinator"`
 	Retention   retention.Config   `toml:"retention"`
 	Precreator  precreator.Config  `toml:"shard-precreation"`
@@ -54,6 +58,8 @@ type Config struct {
 	UDPInputs      []udp.Config      `toml:"udp"`
 
 	ContinuousQuery continuous_querier.Config `toml:"continuous_queries"`
+
+	Hintedhandoff hh.Config `toml:"hinted-handoff`
 
 	// Server reporting
 	ReportingDisabled bool `toml:"reporting-disabled"`

@@ -34,6 +34,7 @@ import (
 	"github.com/uber-go/zap"
 	// Initialize the engine packages
 	_ "github.com/influxdata/influxdb/tsdb/engine"
+	"github.com/zhexuany/influxcloud/cluster"
 )
 
 var startTime time.Time
@@ -74,6 +75,7 @@ type Server struct {
 	Services []Service
 
 	// These references are required for the tcp muxer.
+	ClusterServerice   *cluster.Service
 	SnapshotterService *snapshotter.Service
 
 	Monitor *monitor.Monitor
@@ -347,6 +349,13 @@ func (s *Server) appendContinuousQueryService(c continuous_querier.Config) {
 	s.Services = append(s.Services, srv)
 }
 
+func (s *Server) appendClusterService(c cluster.Config) {
+	srv := cluster.NewService(c)
+	srv.TSDBStore = s.TSDBStore
+	s.Services = append(s.Services, srv)
+	s.ClusterServerice = srv
+}
+
 // Err returns an error channel that multiplexes all out of band errors received from all services.
 func (s *Server) Err() <-chan error { return s.err }
 
@@ -367,6 +376,7 @@ func (s *Server) Open() error {
 	go mux.Serve(ln)
 
 	// Append services.
+	s.appendClusterService(s.config.Cluster)
 	s.appendMonitorService()
 	s.appendPrecreatorService(s.config.Precreator)
 	s.appendSnapshotterService()

@@ -1,20 +1,20 @@
-package hh // import "github.com/zhexuany/influxdb-cluster/hh"
+package hh // import "github.com/zhexuany/influxcloud/hh"
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/monitor/diagnostics"
 	"github.com/influxdata/influxdb/services/meta"
-	"io"
-	"sync/atomic"
 )
 
 // ErrHintedHandoffDisabled is returned when attempting to use a
