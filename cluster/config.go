@@ -65,7 +65,7 @@ func NewConfig() Config {
 	return Config{
 		DialTimeout:               toml.Duration(DefaultDialTimeout),
 		ShardWriterTimeout:        toml.Duration(DefaultShardWriterTimeout),
-		ShardReaderTimeout:        toml.Duration(DefaultShardreaderTimeout),
+		ShardReaderTimeout:        toml.Duration(DefaultShardReaderTimeout),
 		MaxRemoteWriteConnections: DefaultMaxRemoteWriteConnections,
 		ClusterTracing:            DefaultClusterTracing,
 		WriteTimeout:              toml.Duration(DefaultWriteTimeout),
