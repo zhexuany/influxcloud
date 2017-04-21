@@ -407,6 +407,7 @@ func (s *Server) Open() error {
 	s.Monitor.MetaClient = s.MetaClient
 
 	s.SnapshotterService.Listener = mux.Listen(snapshotter.MuxHeader)
+	s.ClusterServerice.Listener = mux.Listen(cluster.MuxHeader)
 
 	// Configure logging for all services and clients.
 	if s.config.Meta.LoggingEnabled {
@@ -422,6 +423,7 @@ func (s *Server) Open() error {
 		svc.WithLogger(s.Logger)
 	}
 	s.SnapshotterService.WithLogger(s.Logger)
+	s.ClusterServerice.SetLogOutput(s.Logger)
 	s.Monitor.WithLogger(s.Logger)
 
 	// Open TSDB store.

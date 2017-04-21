@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/zhexuany/influxcloud/rpc"
 	"github.com/zhexuany/influxcloud/tlv"
+	"go.uber.org/zap"
 )
 
 // MaxMessageSize defines how large a message can be before we reject it
@@ -68,6 +69,7 @@ func (s *Service) SetLogOutput(l *log.Logger) {
 }
 
 // serve accepts connections from the listener and handles them
+
 func (s *Service) serve() {
 	defer s.wg.Done()
 
