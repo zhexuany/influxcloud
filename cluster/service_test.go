@@ -6,10 +6,10 @@ import (
 	"net"
 	"time"
 
-	"github.com/influxdata/influxdb/cluster"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tcp"
+	"github.com/zhexuany/influxcloud/cluster"
 )
 
 type metaClient struct {
@@ -23,8 +23,8 @@ func (m *metaClient) DataNode(nodeID uint64) (*meta.NodeInfo, error) {
 	}, nil
 }
 
-func (m *metaClient) ShardOwner(shardID uint64) (db, rp string, sgi *meta.ShardGroupInfo) {
-	return "db", "rp", &meta.ShardGroupInfo{}
+func (m *metaClient) ShardOwner(shardID uint64) (db, rp string, si *meta.ShardInfo) {
+	return "db", "rp", &meta.ShardInfo{}
 }
 
 type testService struct {

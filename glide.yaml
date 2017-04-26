@@ -1,15 +1,12 @@
-package: github.com/influxCloud/influxcloud
+package: github.com/zhexuany/influxcloud
 import:
 - package: github.com/BurntSushi/toml
-  version: v0.3.0
 - package: github.com/gogo/protobuf
-  version: v0.4
   subpackages:
   - proto
 - package: github.com/hashicorp/raft
 - package: github.com/hashicorp/raft-boltdb
 - package: github.com/influxdata/influxdb
-  version: v1.2.3
   subpackages:
   - cmd
   - cmd/influxd/backup
@@ -42,24 +39,12 @@ import:
   subpackages:
   - v1
 - package: github.com/uber-go/zap
-  version: v1.2.0
-- package: github.com/zhexuany/influxcloud
-  subpackages:
-  - cmd/influxd-meta/run
-  - meta
-  - meta/internal
-  - rpc
-  - rpc/internal
-  - tlv
-- package: github.com/zhexuany/influxdb-cluster
-  subpackages:
-  - meta
+- package: go.uber.org/zap
 - package: golang.org/x/crypto
   subpackages:
   - bcrypt
 - package: gopkg.in/fatih/pool.v2
 testImport:
 - package: github.com/davecgh/go-spew
-  version: v1.1.0
   subpackages:
   - spew

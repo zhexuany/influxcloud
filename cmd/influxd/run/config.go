@@ -31,7 +31,7 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	"github.com/zhexuany/influxcloud/cluster"
 	"github.com/zhexuany/influxcloud/hh"
-	"github.com/zhexuany/influxdb-cluster/hh"
+	"github.com/zhexuany/influxcloud/hh"
 )
 
 const (
