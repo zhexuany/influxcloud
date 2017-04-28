@@ -1,7 +1,7 @@
 # ignore all file
-*
+#*
 # Unignore all with extentions
-!*.*
+#!*.*
 
 # Unignore all dirs
 !*/
