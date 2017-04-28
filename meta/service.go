@@ -18,9 +18,12 @@ import (
 var mutex sync.RWMutex
 
 const (
+	// MuxHeader is header that used in tcp pakcage that help tcp distinguish
+	// different service.
 	MuxHeader = 8
 )
 
+// Service provides cluster service.
 type Service struct {
 	RaftListener net.Listener
 
@@ -66,10 +69,12 @@ func now() time.Time {
 	return t
 }
 
+// SetVersion sets version.
 func (s *Service) SetVersion(version string) {
 	s.version = version
 }
 
+// Version return current handler's version.
 func (s *Service) Version() string {
 	return s.version
 }
@@ -151,6 +156,7 @@ func (s *Service) Open() error {
 	return nil
 }
 
+// ResetStore resets store.
 func (s *Service) ResetStore(st *store) {
 	s.store = st
 }
@@ -196,6 +202,7 @@ func (s *Service) Close() error {
 	return nil
 }
 
+// RemoteHTTPAddr returns a remote httpAddr according to a addr.
 func (s *Service) RemoteHTTPAddr(addr string) string {
 	return s.remoteAddr(s.httpAddr)
 }
@@ -205,6 +212,7 @@ func (s *Service) HTTPAddr() string {
 	return s.httpAddr
 }
 
+// RemoteRaftAddr returns a remote raft httpAddr.
 func (s *Service) RemoteRaftAddr() string {
 	return s.remoteAddr(s.raftAddr)
 }

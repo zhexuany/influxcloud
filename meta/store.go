@@ -248,13 +248,13 @@ func (s *store) filterAddr(addrs []string, filter string) ([]string, error) {
 			return nil, err
 		}
 
-		joinIp, err := net.ResolveIPAddr("ip", joinHost)
+		joinIP, err := net.ResolveIPAddr("ip", joinHost)
 		if err != nil {
 			return nil, err
 		}
 
 		// Don't allow joining ourselves
-		if ip.String() == joinIp.String() && port == joinPort {
+		if ip.String() == joinIP.String() && port == joinPort {
 			continue
 		}
 		joinPeers = append(joinPeers, addr)

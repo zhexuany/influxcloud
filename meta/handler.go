@@ -486,18 +486,21 @@ func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
 	http.Error(w, "", status)
 }
 
+// Lease is a lease distributed over cluster.
 type Lease struct {
 	Name       string    `json:"name"`
 	Expiration time.Time `json:"expiration"`
 	Owner      uint64    `json:"owner"`
 }
 
+// Leases is a wrapper for many leases.
 type Leases struct {
 	mu sync.Mutex
 	m  map[string]*Lease
 	d  time.Duration
 }
 
+// NewLeases creates new leases.
 func NewLeases(d time.Duration) *Leases {
 	return &Leases{
 		m: make(map[string]*Lease),
@@ -505,6 +508,7 @@ func NewLeases(d time.Duration) *Leases {
 	}
 }
 
+// Acquire acquires lease according to lease name and nodeID.
 func (leases *Leases) Acquire(name string, nodeID uint64) (*Lease, error) {
 	leases.mu.Lock()
 	defer leases.mu.Unlock()

@@ -172,7 +172,7 @@ func (c *Client) Leave() error {
 	return c.resetMetaServers()
 }
 
-// GetNodeID returns the client's node ID.
+// NodeID returns the client's node ID.
 func (c *Client) NodeID() uint64 { return c.nodeID }
 
 // SetMetaServers updates the meta servers on the client.
@@ -182,6 +182,7 @@ func (c *Client) SetMetaServers(a []string) {
 	c.metaServers = a
 }
 
+// CheckMetaServers checks meta nodes status.
 func (c *Client) CheckMetaServers() error {
 	resp, err := c.get("")
 	buf, err := ioutil.ReadAll(resp.Body)
@@ -201,6 +202,7 @@ func (c *Client) CheckMetaServers() error {
 	return nil
 }
 
+// Path retusn meta data's path.
 func (c *Client) Path() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -214,6 +216,7 @@ func (c *Client) SetPath(path string) {
 	c.path = path
 }
 
+// TLS return true if tls mode is enabled.
 func (c *Client) TLS() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -228,6 +231,7 @@ func (c *Client) SetTLS(v bool) {
 	c.tls = v
 }
 
+// SetHTTPClient sets httpClient.
 func (c *Client) SetHTTPClient(httpClient *http.Client) {
 	c.mu.Lock()
 	c.HTTPClient = httpClient
@@ -251,7 +255,6 @@ func (c *Client) Ping(checkAllMetaServers bool) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
@@ -295,7 +298,6 @@ func (c *Client) acquireLease(name string) (*meta.Lease, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
 
 		switch resp.StatusCode {
 		case http.StatusOK:
@@ -342,7 +344,7 @@ func (c *Client) ClusterID() uint64 {
 	return c.data().Data.ClusterID
 }
 
-// Node returns a node by id.
+// DataNode returns a node by id.
 func (c *Client) DataNode(id uint64) (*NodeInfo, error) {
 	for _, n := range c.data().DataNodes {
 		if n.ID == id {
@@ -378,6 +380,7 @@ func (c *Client) CreateDataNode(httpAddr, tcpAddr string) (*NodeInfo, error) {
 	return n, nil
 }
 
+// ShardPendingOwners returns an array of all pending ShardOwners.
 func (c *Client) ShardPendingOwners() uint64arr {
 	mns := c.data().MetaNodes
 	for _, meta := range mns {
@@ -389,6 +392,7 @@ func (c *Client) ShardPendingOwners() uint64arr {
 	return uint64arr{}
 }
 
+// RemovePendingShardOwner removes a pending shardOwner according to shardID and nodeID.
 func (c *Client) RemovePendingShardOwner(id, nodeid uint64) error {
 	cmd := &internal.RemovePendingShardOwnerCommand{
 		ID:     proto.Uint64(id),
@@ -398,6 +402,7 @@ func (c *Client) RemovePendingShardOwner(id, nodeid uint64) error {
 	return c.retryUntilExec(internal.Command_RemovePendingShardOwnerCommand, internal.E_RemovePendingShardOwnerCommand_Command, cmd)
 }
 
+// CommitPendingShardOwner commits pending shardOwner.
 func (c *Client) CommitPendingShardOwner(id, nodeid uint64) error {
 	cmd := &internal.CommitPendingShardOwnerCommand{
 		ID:     proto.Uint64(id),
@@ -407,6 +412,7 @@ func (c *Client) CommitPendingShardOwner(id, nodeid uint64) error {
 	return c.retryUntilExec(internal.Command_CommitPendingShardOwnerCommand, internal.E_CommitPendingShardOwnerCommand_Command, cmd)
 }
 
+// AddShardOwner adds shardOwner.
 func (c *Client) AddShardOwner(id, nodeid uint64) error {
 	cmd := &internal.AddShardOwnerCommand{
 		ID:     proto.Uint64(id),
@@ -416,6 +422,7 @@ func (c *Client) AddShardOwner(id, nodeid uint64) error {
 	return c.retryUntilExec(internal.Command_AddShardOwnerCommand, internal.E_AddShardOwnerCommand_Command, cmd)
 }
 
+// RemoveShardOwner removes shardOwner according to shardID and nodeID.
 func (c *Client) RemoveShardOwner(id, nodeid uint64) error {
 	cmd := &internal.RemoveShardOwnerCommand{
 		ID:     proto.Uint64(id),
@@ -425,6 +432,7 @@ func (c *Client) RemoveShardOwner(id, nodeid uint64) error {
 	return c.retryUntilExec(internal.Command_RemoveShardOwnerCommand, internal.E_AddShardOwnerCommand_Command, cmd)
 }
 
+// UpdateDataNode updates data node info according nodeID.
 func (c *Client) UpdateDataNode(id uint64, host, tcpHost string) error {
 	cmd := &internal.UpdateDataNodeCommand{
 		ID:      proto.Uint64(id),
@@ -891,13 +899,12 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 
 		// Successfully joined
 		if resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
 			if err := json.NewDecoder(resp.Body).Decode(&node); err != nil {
 				return nil, err
 			}
 			break
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// We tried to join a meta node that was not the leader, rety at the node
 		// they think is the leader.
@@ -914,6 +921,7 @@ func (c *Client) JoinMetaServer(httpAddr, tcpAddr string) (*NodeInfo, error) {
 	return node, nil
 }
 
+// CreateMetaNode creates meta node.
 func (c *Client) CreateMetaNode(httpAddr, tcpAddr string) (*NodeInfo, error) {
 	cmd := &internal.CreateMetaNodeCommand{
 		HTTPAddr: proto.String(httpAddr),
@@ -935,6 +943,7 @@ func (c *Client) CreateMetaNode(httpAddr, tcpAddr string) (*NodeInfo, error) {
 	return n, nil
 }
 
+// DeleteMetaNode deletes meta node from meta store according to nodeID.
 func (c *Client) DeleteMetaNode(id uint64) error {
 	cmd := &internal.DeleteMetaNodeCommand{
 		ID: proto.Uint64(id),
@@ -943,6 +952,7 @@ func (c *Client) DeleteMetaNode(id uint64) error {
 	return c.retryUntilExec(internal.Command_DeleteMetaNodeCommand, internal.E_DeleteMetaNodeCommand_Command, cmd)
 }
 
+// CreateContinuousQuery creates continue query in cluster.
 func (c *Client) CreateContinuousQuery(database, name, query string) error {
 	return c.retryUntilExec(internal.Command_CreateContinuousQueryCommand, internal.E_CreateContinuousQueryCommand_Command,
 		&internal.CreateContinuousQueryCommand{
@@ -953,6 +963,7 @@ func (c *Client) CreateContinuousQuery(database, name, query string) error {
 	)
 }
 
+// DropContinuousQuery drops continue query in cluster.
 func (c *Client) DropContinuousQuery(database, name string) error {
 	return c.retryUntilExec(internal.Command_DropContinuousQueryCommand, internal.E_DropContinuousQueryCommand_Command,
 		&internal.DropContinuousQueryCommand{
@@ -962,6 +973,7 @@ func (c *Client) DropContinuousQuery(database, name string) error {
 	)
 }
 
+// CreateSubscription creats subscription in cluster.
 func (c *Client) CreateSubscription(database, rp, name, mode string, destinations []string) error {
 	return c.retryUntilExec(internal.Command_CreateSubscriptionCommand, internal.E_CreateSubscriptionCommand_Command,
 		&internal.CreateSubscriptionCommand{
@@ -974,6 +986,7 @@ func (c *Client) CreateSubscription(database, rp, name, mode string, destination
 	)
 }
 
+// DropSubscription drops subscription in cluster.
 func (c *Client) DropSubscription(database, rp, name string) error {
 	return c.retryUntilExec(internal.Command_DropSubscriptionCommand, internal.E_DropSubscriptionCommand_Command,
 		&internal.DropSubscriptionCommand{
@@ -984,10 +997,12 @@ func (c *Client) DropSubscription(database, rp, name string) error {
 	)
 }
 
+// Data returns a reference of data.
 func (c *Client) Data() *Data {
 	return c.data().Clone()
 }
 
+// SetData sets data.
 func (c *Client) SetData(data *Data) error {
 	dataB, _ := data.MarshalBinary()
 	return c.retryUntilExec(internal.Command_SetDataCommand, internal.E_SetDataCommand_Command,
@@ -1005,16 +1020,19 @@ func (c *Client) WaitForDataChanged() chan struct{} {
 	return c.changed
 }
 
+// MarshalBinary marshals data into a bianry form.
 func (c *Client) MarshalBinary() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.cacheData.MarshalBinary()
 }
 
+// Logger return a reference of logger.
 func (c *Client) Logger() *log.Logger {
 	return c.logger
 }
 
+// SetLogger sets logger.
 func (c *Client) SetLogger(l *log.Logger) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1111,7 +1129,6 @@ func (c *Client) exec(url string, typ internal.Command_Type, desc *proto.Extensi
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
 
 	// read the response
 	if resp.StatusCode == http.StatusTemporaryRedirect {
@@ -1182,7 +1199,6 @@ func (c *Client) getSnapshot(server string, index uint64) (*Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("meta server returned non-200: %s", resp.Status)
@@ -1211,7 +1227,6 @@ func (c *Client) peers() []string {
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
 
 		// This meta-server might not be ready to answer, continue on
 		if resp.StatusCode != http.StatusOK {
@@ -1320,7 +1335,6 @@ func (c *Client) loadMetaServers(path string) error {
 		}
 		return err
 	}
-	defer f.Close()
 
 	if err := json.NewDecoder(f).Decode(c.metaServers); err != nil {
 		return err
@@ -1348,7 +1362,7 @@ func (c *Client) resetMetaServers() error {
 	}
 
 	if err := json.NewEncoder(f).Encode(metas); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 
@@ -1363,6 +1377,7 @@ func (c *Client) resetMetaServers() error {
 	return os.Rename(tmpFile, file)
 }
 
+// MetaServers returns all meta node info in cluster.
 func (c *Client) MetaServers() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -1397,14 +1412,17 @@ func (c *Client) tryHTTP() {
 
 func (c *Client) doHTTPWithRedirect() {}
 
+// Peers represents meta node's peer host addres
 type Peers []string
 
+// Append appends a/many peers.
 func (peers Peers) Append(p ...string) Peers {
 	peers = append(peers, p...)
 
 	return peers.Unique()
 }
 
+// Unique remove duplicated elements in peers and return a new Peers.
 func (peers Peers) Unique() Peers {
 	distinct := map[string]struct{}{}
 	for _, p := range peers {
@@ -1418,6 +1436,7 @@ func (peers Peers) Unique() Peers {
 	return u
 }
 
+// Contains return true if peer is in Peers.
 func (peers Peers) Contains(peer string) bool {
 	for _, p := range peers {
 		if p == peer {

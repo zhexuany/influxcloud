@@ -177,7 +177,7 @@ func (fsm *storeFSM) applyCreateRetentionPolicyCommand(cmd *internal.Command) in
 	ext, _ := proto.GetExtension(cmd, internal.E_CreateRetentionPolicyCommand_Command)
 	v := ext.(*internal.CreateRetentionPolicyCommand)
 	rpi := meta.RetentionPolicyInfo{}
-	rpi.UnmarshalBinary(v.GetRetentionPolicy())
+	_ = rpi.UnmarshalBinary(v.GetRetentionPolicy())
 
 	// Copy data and update.
 	other := fsm.data.Clone()
@@ -400,7 +400,7 @@ func (fsm *storeFSM) applySetDataCommand(cmd *internal.Command) interface{} {
 
 	// Overwrite data.
 	fsm.data = &Data{}
-	fsm.data.UnmarshalBinary(v.GetData())
+	_ = fsm.data.UnmarshalBinary(v.GetData())
 	return nil
 }
 
@@ -409,7 +409,7 @@ func (fsm *storeFSM) applyCreateMetaNodeCommand(cmd *internal.Command) interface
 	v := ext.(*internal.CreateMetaNodeCommand)
 
 	other := fsm.data.Clone()
-	other.CreateMetaNode(v.GetHTTPAddr(), v.GetTCPAddr())
+	_ = other.CreateMetaNode(v.GetHTTPAddr(), v.GetTCPAddr())
 
 	// If the cluster ID hasn't been set then use the command's random number.
 	if other.Data.ClusterID == 0 {
@@ -431,7 +431,7 @@ func (fsm *storeFSM) applySetMetaNodeCommand(cmd *internal.Command) interface{} 
 		other.Data.ClusterID = uint64(v.GetRand())
 	}
 
-	other.SetMetaNode(other.Data.ClusterID, v.GetHTTPAddr(), v.GetTCPAddr())
+	_ = other.SetMetaNode(other.Data.ClusterID, v.GetHTTPAddr(), v.GetTCPAddr())
 
 	fsm.data = other
 	return nil
@@ -463,7 +463,7 @@ func (fsm *storeFSM) applyCreateDataNodeCommand(cmd *internal.Command) interface
 	v := ext.(*internal.CreateDataNodeCommand)
 
 	other := fsm.data.Clone()
-	other.CreateDataNode(v.GetHTTPAddr(), v.GetTCPAddr())
+	_ = other.CreateDataNode(v.GetHTTPAddr(), v.GetTCPAddr())
 
 	fsm.data = other
 	return nil
@@ -592,7 +592,7 @@ func (s *storeFSMSnapshot) Persist(sink raft.SnapshotSink) error {
 	}()
 
 	if err != nil {
-		sink.Cancel()
+		_ = sink.Cancel()
 		return err
 	}
 

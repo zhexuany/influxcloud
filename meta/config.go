@@ -99,6 +99,7 @@ func NewConfig() *Config {
 	return cfg
 }
 
+// NewDemoConfig creates a new default config.
 func NewDemoConfig() *Config {
 	c := NewConfig()
 
@@ -118,6 +119,7 @@ func NewDemoConfig() *Config {
 	return c
 }
 
+// Validate validates a config.
 func (c *Config) Validate() error {
 	if c.Dir == "" {
 		return errors.New("Meta.Dir must be specified")
@@ -240,6 +242,7 @@ func (c *Config) defaultHost(addr string) string {
 	return address
 }
 
+// DefaultHost return defaultHost
 func DefaultHost(hostname, addr string) (string, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
