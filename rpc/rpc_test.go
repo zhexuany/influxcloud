@@ -1,25 +1,23 @@
 package rpc_test
 
 import (
-	"errors"
-	"reflect"
+	"bytes"
+	"github.com/influxdata/influxdb/models"
+	"github.com/zhexuany/influxcloud/rpc"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/influxdata/influxdb/influxql"
 )
 
 func TestWriteShardRequestBinary(t *testing.T) {
-	sr := &WriteShardRequest{}
+	sr := &rpc.WriteShardRequest{}
 
 	sr.SetShardID(uint64(1))
 	if exp := uint64(1); sr.ShardID() != exp {
 		t.Fatalf("ShardID mismatch: got %v, exp %v", sr.ShardID(), exp)
 	}
 
-	sr.AddPoint("cpu", 1.0, time.Unix(0, 0), map[string]string{"host": "serverA"})
-	sr.AddPoint("cpu", 2.0, time.Unix(0, 0).Add(time.Hour), nil)
+	sr.AddPoint("cpu", 1.0, time.Now(), models.NewTags(map[string]string{"host": "serverA"}))
+	sr.AddPoint("cpu", 2.0, time.Now().Add(time.Hour), nil)
 	sr.AddPoint("cpu_load", 3.0, time.Unix(0, 0).Add(time.Hour+time.Second), nil)
 
 	b, err := sr.MarshalBinary()
@@ -30,7 +28,7 @@ func TestWriteShardRequestBinary(t *testing.T) {
 		t.Fatalf("WritePointsRequest.MarshalBinary() returned 0 bytes")
 	}
 
-	got := &WriteShardRequest{}
+	got := &rpc.WriteShardRequest{}
 	if err := got.UnmarshalBinary(b); err != nil {
 		t.Fatalf("WritePointsRequest.UnmarshalMarshalBinary() failed: %v", err)
 	}
@@ -60,26 +58,28 @@ func TestWriteShardRequestBinary(t *testing.T) {
 			t.Errorf("Point #%d HashID() mismatch: got %v, exp %v", i, g.HashID(), p.HashID())
 		}
 
-		for k, v := range p.Tags() {
-			if g.Tags()[k] != v {
-				t.Errorf("Point #%d tag mismatch: got %v, exp %v", i, k, v)
+		for _, tag := range p.Tags() {
+			if exp := bytes.Compare(g.Tags().Get(tag.Key), tag.Value); exp != 0 {
+				t.Errorf("Point #%d tag mismatch: got %v, exp %v", i, tag.Key, tag.Value)
 			}
 		}
 
-		if len(p.Fields()) != len(g.Fields()) {
-			t.Errorf("Point %d field count mismatch: got %v, exp %v", i, len(g.Fields()), len(p.Fields()))
+		pFields, _ := p.Fields()
+		gFields, _ := g.Fields()
+		if len(pFields) != len(gFields) {
+			t.Errorf("Point %d field count mismatch: got %v, exp %v", i, len(gFields), len(pFields))
 		}
 
-		for j, f := range p.Fields() {
-			if g.Fields()[j] != f {
-				t.Errorf("Point %d field mismatch: got %v, exp %v", i, g.Fields()[j], f)
+		for j, f := range pFields {
+			if gFields[j] != f {
+				t.Errorf("Point %d field mismatch: got %v, exp %v", i, gFields[j], f)
 			}
 		}
 	}
 }
 
 func TestWriteShardResponseBinary(t *testing.T) {
-	sr := &WriteShardResponse{}
+	sr := &rpc.WriteShardResponse{}
 	sr.SetCode(10)
 	sr.SetMessage("foo")
 	b, err := sr.MarshalBinary()
@@ -99,7 +99,7 @@ func TestWriteShardResponseBinary(t *testing.T) {
 		t.Fatalf("WritePointsResponse.MarshalBinary() returned 0 bytes")
 	}
 
-	got := &WriteShardResponse{}
+	got := &rpc.WriteShardResponse{}
 	if err := got.UnmarshalBinary(b); err != nil {
 		t.Fatalf("WritePointsResponse.UnmarshalMarshalBinary() failed: %v", err)
 	}
