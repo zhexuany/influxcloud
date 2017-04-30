@@ -4,13 +4,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/influxdata/influxdb/models"
+	"github.com/uber-go/zap"
 	"github.com/zhexuany/influxcloud/meta"
 	"sync/atomic"
 )
@@ -44,7 +44,7 @@ type NodeProcessor struct {
 
 	stats       *Statistics
 	defaultTags models.StatisticTags
-	Logger      *log.Logger
+	Logger      zap.Logger
 }
 
 // NewNodeProcessor returns a new NodeProcessor for the given node, using dir for
@@ -64,7 +64,7 @@ func NewNodeProcessor(nodeID uint64, dir string, w shardWriter, m metaClient, cf
 			"path":         dir,
 		},
 
-		Logger: log.New(os.Stderr, "[handoff] ", log.LstdFlags),
+		Logger: zap.New(zap.NullEncoder()),
 	}
 
 	return n
@@ -266,7 +266,7 @@ func (n *NodeProcessor) run() {
 			return
 		case <-purgeTicker.C:
 			if err := n.queue.PurgeOlderThan(time.Now().Add(-time.Duration(n.cfg.MaxAge))); err != nil {
-				n.Logger.Printf("failed to purge for node %d: %s", n.nodeID, err.Error())
+				// n.Logger.Info("failed to purge for node %d: %s", n.nodeID, err.Error())
 			}
 		case <-retryTicker.C:
 			for {
@@ -282,7 +282,7 @@ func (n *NodeProcessor) run() {
 						if currInterval > time.Duration(n.cfg.RetryMaxInterval) {
 							currInterval = time.Duration(n.cfg.RetryMaxInterval)
 						}
-						n.Logger.Printf("error on sending write:%v", err)
+						// n.Logger.Info("error on sending write:%v", err)
 					}
 					break
 				}
@@ -327,7 +327,7 @@ func (n *NodeProcessor) SendWrite() (int, error) {
 		shardID, points, err := unmarshalWrite(buf)
 		if err != nil {
 			atomic.AddInt64(&n.stats.WriteNodeReqFail, 1)
-			n.Logger.Printf("unmarshal write failed: %v", err)
+			// n.Logger.Info("unmarshal write failed: %v", err)
 
 			// send err via channels
 			ch <- err
@@ -350,12 +350,12 @@ func (n *NodeProcessor) SendWrite() (int, error) {
 		if r == io.EOF || r == meta.ErrNodeNotFound {
 			return 0, r
 		}
-		n.Logger.Printf("SendWrite error: %v", r)
+		// n.Logger.Info("SendWrite error: %v", r)
 	}
 
 	// Advance pos in segment if r is nil
 	if err := n.queue.Advance(); err != nil {
-		n.Logger.Printf("failed to advance queue for node %d: %s", n.nodeID, err.Error())
+		// n.Logger.Info("failed to advance queue for node %d: %s", n.nodeID, err.Error())
 	}
 
 	// return how much length already wroten into node

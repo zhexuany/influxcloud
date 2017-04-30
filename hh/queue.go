@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/uber-go/zap"
 )
 
 // Possible errors returned by a hinted handoff queue.
@@ -76,7 +77,7 @@ type queue struct {
 	segments segments
 
 	// Logger print userful logs
-	Logger *log.Logger
+	Logger zap.Logger
 }
 
 type queuePos struct {
@@ -103,14 +104,9 @@ func newQueue(dir string, maxSize int64) (*queue, error) {
 	return q, nil
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (l *queue) SetLogger(log *log.Logger) {
-	l.Logger = log
-}
-
-// SetLogOutput sets the internal writer to the writer passed in.
-func (l *queue) SetLogOutput(w io.Writer) {
-	l.Logger.SetOutput(w)
+// WithLogger sets the internal logger to the logger passed in
+func (l *queue) WithLogger(log zap.Logger) {
+	l.Logger = log.With(zap.String("service", "cluster"))
 }
 
 // Open opens the queue for reading and writing
@@ -316,7 +312,7 @@ func (l *queue) loadSegments() (segments, error) {
 		}
 
 		path := filepath.Join(l.dir, segment.Name())
-		l.Logger.Printf("creating segement: %s", path)
+		l.Logger.Info("creating segement: " + path)
 		segment, err := newSegment(path, l.maxSegmentSize)
 		if err != nil {
 			return segments, err

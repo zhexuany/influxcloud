@@ -2,9 +2,7 @@ package hh // import "github.com/zhexuany/influxcloud/hh"
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,6 +13,7 @@ import (
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/monitor/diagnostics"
 	"github.com/influxdata/influxdb/services/meta"
+	"github.com/uber-go/zap"
 )
 
 // ErrHintedHandoffDisabled is returned when attempting to use a
@@ -38,7 +37,7 @@ type Service struct {
 	defaultTags models.StatisticTags
 	stats       *HHStatistics
 
-	Logger *log.Logger
+	Logger zap.Logger
 	cfg    Config
 
 	shardWriter shardWriter
@@ -71,7 +70,7 @@ func NewService(c Config, w shardWriter, m metaClient) *Service {
 		closing:     make(chan struct{}),
 		processors:  make(map[uint64]*NodeProcessor),
 		stats:       &HHStatistics{},
-		Logger:      log.New(os.Stderr, "[handoff] ", log.LstdFlags),
+		Logger:      zap.New(zap.NullEncoder()),
 		shardWriter: w,
 		MetaClient:  m,
 	}
@@ -89,7 +88,7 @@ func (s *Service) Open() error {
 		// Allow Open to proceed, but don't do anything.
 		return nil
 	}
-	s.Logger.Printf("Starting hinted handoff service")
+	s.Logger.Info("Starting hinted handoff service")
 	s.closing = make(chan struct{})
 
 	// Register diagnostics if a Monitor service is available.
@@ -98,7 +97,7 @@ func (s *Service) Open() error {
 	}
 
 	// Create the root directory if it doesn't already exist.
-	s.Logger.Printf("Using data dir: %v", s.cfg.Dir)
+	// s.Logger.Info("Using data dir: %v", s.cfg.Dir)
 	if err := os.MkdirAll(s.cfg.Dir, 0700); err != nil {
 		return fmt.Errorf("mkdir all: %s", err)
 	}
@@ -132,7 +131,7 @@ func (s *Service) Open() error {
 
 // Close closes the hinted handoff service.
 func (s *Service) Close() error {
-	s.Logger.Println("shutting down hh service")
+	s.Logger.Info("shutting down hh service")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -155,16 +154,9 @@ func (s *Service) Close() error {
 	return nil
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) {
-	if l != nil {
-		s.Logger = l
-	}
-}
-
-func (s *Service) SetLogOutput(w io.Writer) {
-	l := log.New(w, "[hh]", log.LstdFlags)
-	s.Logger = l
+// WithLogger sets the internal logger to the logger passed in
+func (s *Service) WithLogger(log zap.Logger) {
+	s.Logger = log.With(zap.String("service", "cluster"))
 }
 
 // HHStatistics keeps all statistcs realted with hinted handoff service
@@ -284,32 +276,32 @@ func (s *Service) purgeInactiveProcessors() {
 				for k, v := range s.processors {
 					if v.Closed() {
 						if err := s.remove(v); err != nil {
-							s.Logger.Printf("error removing node proce: %v", err)
+							s.Logger.Info("error removing node proce: " + err.Error())
 							continue
 						}
 						// remove node processor from map
 						delete(s.processors, k)
-						s.Logger.Printf("removed node processor %d from map", k)
+						// s.Logger.Info("removed node processor %d from map", k)
 						continue
 					}
 					lm, err := v.LastModified()
 					if err != nil {
-						s.Logger.Printf("failed to determine LastModified for processor %d: %s", k, err.Error())
+						// s.Logger.Info("failed to determine LastModified for processor %d: %s", k, err.Error())
 						continue
 					}
 
 					active, err := v.Active()
 					if err != nil {
 						if err := s.remove(v); err != nil {
-							s.Logger.Printf("failed to determine if node %d is active: %s", k, err.Error())
+							// s.Logger.Info("failed to determine if node %d is active: %s", k, err.Error())
 							continue
 						}
 						// remove node processor from map
 						delete(s.processors, k)
-						s.Logger.Printf("removed node processor %d from map", k)
+						// s.Logger.Info("removed node processor %d from map", k)//
 						continue
 					} else if active {
-						s.Logger.Printf("node processor %d is active. Skiping it", k)
+						// s.Logger.Info("node processor %d is active. Skiping it", k)
 						// Node is active.
 						continue
 					}
@@ -322,7 +314,7 @@ func (s *Service) purgeInactiveProcessors() {
 					}
 
 					if err := s.remove(v); err != nil {
-						s.Logger.Printf("error removing node proce: %v", err)
+						// s.Logger.Info("error removing node proce: %v", err)
 						continue
 					}
 					delete(s.processors, k)
