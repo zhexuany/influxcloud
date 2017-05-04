@@ -100,13 +100,12 @@ func (n *NodeProcessor) Open() error {
 	if err := queue.Open(); err != nil {
 		return err
 	}
+	n.queue = queue
 
 	atomic.StoreInt64(&n.stats.WriteDiskBytes, queue.TotalBytes())
 
-	// queue.
 	n.wg.Add(1)
 	go n.run()
-	n.queue = queue
 
 	return nil
 }
@@ -244,8 +243,6 @@ func (n *NodeProcessor) LastModified() (time.Time, error) {
 	return t.UTC(), nil
 }
 
-//
-//
 // run attempts to send any existing hinted handoff data to the target node. It also purges
 // any hinted handoff data older than the configured time.
 func (n *NodeProcessor) run() {

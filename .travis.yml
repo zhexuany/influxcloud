@@ -1,7 +1,5 @@
 language: go
-before_script:
-  - 
-install: make get-dep
 
-script: go test -v -tags integration ./...
+script:
+  -  go test -race $(go list ./... | grep -v /vendor/)
 
