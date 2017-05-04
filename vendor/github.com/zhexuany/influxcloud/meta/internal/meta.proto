@@ -1,0 +1,482 @@
+package internal;
+
+//========================================================================
+//
+// Metadata
+//
+//========================================================================
+
+message ClusterData {
+  required bytes Data = 1;
+  required uint64 MaxNodeID = 2;
+  repeated NodeInfo DataNodes = 3;
+  repeated NodeInfo MetaNodes = 4;
+  repeated RoleInfo Roles = 5;
+  repeated UserInfo Users = 6;
+}
+
+message NodeInfo {
+	required uint64 ID = 1;
+	required string Host = 2;
+  optional string TCPHost = 3;
+  repeated uint64 PendingShardOwners = 4;
+}
+
+message RoleInfo {
+  required string Name = 1;
+  required UserPrivilege  Permissions = 2;
+  required UserInfo Users = 3;
+}
+
+message UserInfo {
+	required string Name = 1;
+	required string Hash = 2;
+	repeated UserPrivilege Permissions = 3;
+}
+
+message UserPrivilege {
+	required string Database = 1;
+	required int32 Privilege = 2;
+}
+
+message ScopedPermission {
+  required bytes Resources = 1;
+  required UserPrivilege Permissions = 2;
+}
+
+message Response {
+	required bool OK = 1;
+	optional string Error = 2;
+	optional uint64 Index = 3;
+}
+
+//========================================================================
+//
+// COMMANDS
+//
+//========================================================================
+
+message Command {
+    extensions 100 to max;
+
+    enum Type {
+		  CreateDatabaseCommand            = 1;
+      DropDatabaseCommand              = 2;
+      CreateRetentionPolicyCommand     = 3;
+      DropRetentionPolicyCommand       = 4;
+      SetDefaultRetentionPolicyCommand = 5;
+      UpdateRetentionPolicyCommand     = 6;
+      CreateShardGroupCommand          = 7;
+      DeleteShardGroupCommand          = 8;
+      CreateContinuousQueryCommand     = 9;
+      DropContinuousQueryCommand       = 10;
+      CreateUserCommand                = 11;
+      DropUserCommand                  = 12;
+      UpdateUserCommand                = 13;
+      SetPrivilegeCommand              = 14;
+      CreateRoleCommand                = 15;
+      DropRoleCommand                  = 16;
+      AddRoleUsersCommand              = 17;
+      RemoveRoleUsersCommand           = 18;
+      AddRolePermissionsCommand        = 19;
+      RemoveRolePermissionsCommand     = 20;
+      SetDataCommand                   = 21;
+      SetAdminPrivilegeCommand         = 22;
+      CreateSubscriptionCommand        = 23;
+      DropSubscriptionCommand          = 24;
+      RemovePeerCommand                = 25;
+      CreateMetaNodeCommand            = 26;
+      CreateDataNodeCommand            = 27;
+      UpdateDataNodeCommand            = 28;
+      DeleteMetaNodeCommand            = 29;
+      DeleteDataNodeCommand            = 30;
+      SetMetaNodeCommand               = 31;
+      DropShardCommand                 = 32;
+      ImportDataCommand                = 33;
+      SetUserPasswordCommand           = 34;
+      AddUserPermissionsCommand        = 35;
+      RemoveUserPermissionsCommand     = 36;
+      AddShardOwnerCommand             = 37;
+      RemoveShardOwnerCommand          = 38;
+      AddPendingShardOwnerCommand      = 39;
+      CommitPendingShardOwnerCommand   = 40;
+      RemovePendingShardOwnerCommand   = 41;
+      TruncateShardGroupsCommand       = 42;
+      ChangeRoleNameCommand            = 43;
+      CreateBalancedShardGroupCommand  = 44;
+    }
+
+    required Type type = 1;
+}
+
+message CreateDatabaseCommand {
+    extend Command {
+        optional CreateDatabaseCommand command = 101;
+    }
+	required string Name = 1;
+	optional bytes RetentionPolicy = 2;
+}
+
+message DropDatabaseCommand {
+    extend Command {
+        optional DropDatabaseCommand command = 102;
+    }
+	required string Name = 1;
+}
+
+message CreateRetentionPolicyCommand {
+    extend Command {
+        optional CreateRetentionPolicyCommand command = 103;
+    }
+	required string Database = 1;
+	required bytes RetentionPolicy = 2;
+}
+
+message DropRetentionPolicyCommand {
+    extend Command {
+        optional DropRetentionPolicyCommand command = 104;
+    }
+	required string Database = 1;
+	required string Name = 2;
+}
+
+message SetDefaultRetentionPolicyCommand {
+    extend Command {
+        optional SetDefaultRetentionPolicyCommand command = 105;
+    }
+	required string Database = 1;
+	required string Name = 2;
+}
+
+message UpdateRetentionPolicyCommand {
+    extend Command {
+        optional UpdateRetentionPolicyCommand command = 106;
+    }
+	required string Database = 1;
+	required string Name = 2;
+	optional string NewName = 3;
+	optional int64 Duration = 4;
+	optional uint32 ReplicaN = 5;
+}
+
+message CreateShardGroupCommand {
+    extend Command {
+        optional CreateShardGroupCommand command = 107;
+    }
+    required string Database = 1;
+    required string Policy = 2;
+    required int64 Timestamp = 3;
+}
+
+message DeleteShardGroupCommand {
+    extend Command {
+        optional DeleteShardGroupCommand command = 108;
+    }
+    required string Database = 1;
+    required string Policy = 2;
+    required uint64 ShardGroupID = 3;
+}
+
+message CreateContinuousQueryCommand {
+    extend Command {
+        optional CreateContinuousQueryCommand command = 109;
+    }
+    required string Database = 1;
+    required string Name = 2;
+    required string Query = 3;
+}
+
+message DropContinuousQueryCommand {
+    extend Command {
+        optional DropContinuousQueryCommand command = 110;
+    }
+    required string Database = 1;
+    required string Name = 2;
+}
+
+message CreateUserCommand {
+    extend Command {
+        optional CreateUserCommand command = 111;
+    }
+    required string Name = 1;
+    required string Hash = 2;
+    required bool Admin = 3;
+}
+
+message DropUserCommand {
+    extend Command {
+        optional DropUserCommand command = 112;
+    }
+    required string Name = 1;
+}
+
+message UpdateUserCommand {
+    extend Command {
+        optional UpdateUserCommand command = 113;
+    }
+    required string Name = 1;
+    required string Hash = 2;
+}
+
+message SetPrivilegeCommand {
+    extend Command {
+        optional SetPrivilegeCommand command = 114;
+    }
+    required string Username = 1;
+    required string Database = 2;
+    required int32 Privilege = 3;
+}
+
+message CreateRoleCommand {
+    extend Command {
+        optional CreateRoleCommand command = 115;
+    }
+}
+
+message DropRoleCommand {
+    extend Command {
+        optional DropRoleCommand command = 116;
+    }
+
+}
+
+message AddRoleUsersCommand {
+    extend Command {
+        optional AddRoleUsersCommand command = 117;
+    }
+
+}
+message RemoveRoleUsersCommand {
+    extend Command {
+        optional RemoveRoleUsersCommand command = 118;
+    }
+
+} 
+
+message AddRolePermissionsCommand {
+    extend Command {
+        optional AddRolePermissionsCommand command = 119;
+    }
+}
+
+message RemoveRolePermissionsCommand {
+    extend Command {
+        optional RemoveRolePermissionsCommand command = 120;
+    }
+}
+
+message SetDataCommand {
+    extend Command {
+        optional SetDataCommand command = 121;
+    }
+    required bytes Data = 1;
+}
+
+message SetAdminPrivilegeCommand {
+    extend Command {
+        optional SetAdminPrivilegeCommand command = 122;
+    }
+    required string Username = 1;
+    required bool Admin = 2;
+}
+
+message CreateSubscriptionCommand {
+    extend Command {
+        optional CreateSubscriptionCommand command = 123;
+    }
+    required string Name = 1;
+    required string Database = 2;
+    required string RetentionPolicy = 3;
+    required string Mode = 4;
+    repeated string Destinations = 5;
+
+}
+
+message DropSubscriptionCommand {
+    extend Command {
+        optional DropSubscriptionCommand command = 124;
+    }
+    required string Name = 1;
+    required string Database = 2;
+    required string RetentionPolicy = 3;
+}
+
+message RemovePeerCommand {
+    extend Command {
+        optional RemovePeerCommand command = 125;
+    }
+	optional uint64 ID = 1;
+	required string Addr = 2;
+}
+
+message CreateMetaNodeCommand {
+    extend Command {
+        optional CreateMetaNodeCommand command = 126;
+    }
+    required string HTTPAddr = 1;
+    required string TCPAddr = 2;
+    required uint64 Rand = 3;
+}
+
+message CreateDataNodeCommand {
+    extend Command {
+        optional CreateDataNodeCommand command = 127;
+    }
+    required string HTTPAddr = 1;
+    required string TCPAddr = 2;
+}
+
+message UpdateDataNodeCommand {
+    extend Command {
+        optional UpdateDataNodeCommand command = 128;
+    }
+    required uint64 ID = 1;
+    required string Host = 2;
+    required string TCPHost = 3;
+}
+
+message DeleteMetaNodeCommand {
+    extend Command {
+        optional DeleteMetaNodeCommand command = 129;
+    }
+    required uint64 ID = 1;
+}
+
+message DeleteDataNodeCommand {
+    extend Command {
+        optional DeleteDataNodeCommand command = 130;
+    }
+    required uint64 ID = 1;
+}
+
+
+// SetMetaNodeCommand is for the initial metanode in a cluster or
+// if the single host restarts and its hostname changes, this will update it
+message SetMetaNodeCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 131;
+  }
+  required string HTTPAddr = 1;
+  required string TCPAddr = 2;
+  required uint64 Rand = 3;
+}
+
+message DropShardCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 132;
+  }
+  required uint64 ID = 1;
+}
+
+message SetUserPasswordCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 133;
+  }
+  required string Name = 1;
+	required string Hash = 2;
+}
+
+message AddUserPermissionsCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 134;
+  }
+  required string Name = 1;
+  required UserPrivilege Permissions = 2;
+}
+
+message RemoveUserPermissionsCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 135;
+  }
+
+  required string Name = 1;
+  required UserPrivilege Permissions = 2;
+}
+
+message AddShardOwnerCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 136;
+  }
+
+  required uint64 ID = 1;
+  required uint64 NodeID = 2;
+}
+
+message RemoveShardOwnerCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 137;
+  }
+
+  required uint64 ID = 1;
+  required uint64 NodeID = 2;
+}
+
+message AddPendingShardOwnerCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 138;
+  }
+
+  required  uint64 ID = 1;
+  required uint64 NodeID = 2;
+}
+
+message RemovePendingShardOwnerCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 139;
+  }
+
+  required uint64 ID = 1;
+  required uint64 NodeID = 2;
+}
+
+message CommitPendingShardOwnerCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 140;
+  }
+
+  required uint64 ID = 1;
+  required uint64 NodeID = 2;
+}
+
+message TruncateShardGroupCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 141;
+  }
+
+  required uint64 TruncateAt = 1;
+}
+
+message ChangeRoleNameCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 142;
+  }
+
+  required string OldName = 1;
+  required string NewName = 2;
+}
+
+message ImportDataCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 143;
+  }
+
+  required bytes Data = 1;
+  required bool Force = 2;
+  required string Database = 3;
+  required string RetentionPolicy = 4;
+  required uint64 ShardId = 5;
+  required string NewDatabase = 6;
+  required bytes NewRetentionPolicy = 7;
+  required uint64 NewReplicationFactor = 8;
+}
+
+message CreateBalancedShardGroupCommand {
+  extend Command {
+      optional SetMetaNodeCommand command = 144;
+  }
+
+  required string Database = 1;
+  required bytes Policy = 2;
+  required int64 Timestamp = 3;
+}
+

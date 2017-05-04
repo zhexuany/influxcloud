@@ -1,0 +1,12 @@
+# ignore all file
+#*
+# Unignore all with extentions
+#!*.*
+
+# Unignore all dirs
+!*/
+# ignore log file
+*.log
+
+# ignore test file
+*.test

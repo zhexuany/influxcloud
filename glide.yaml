@@ -1,4 +1,4 @@
-package: github.com/zhexuany/influxcloud
+package: .
 import:
 - package: github.com/BurntSushi/toml
 - package: github.com/gogo/protobuf
@@ -39,7 +39,16 @@ import:
   subpackages:
   - v1
 - package: github.com/uber-go/zap
-- package: go.uber.org/zap
+- package: github.com/zhexuany/influxcloud
+  subpackages:
+  - cluster
+  - cmd/influxd-meta/run
+  - hh
+  - meta
+  - meta/internal
+  - rpc
+  - rpc/internal
+  - tlv
 - package: golang.org/x/crypto
   subpackages:
   - bcrypt

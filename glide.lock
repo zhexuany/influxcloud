@@ -1,5 +1,5 @@
-hash: ee7648835ebd1d034f85c5a0f91d1e28dac0479b85adeeecddcae5701e0d37f7
-updated: 2017-04-20T13:15:29.525912391+08:00
+hash: 24ad4e2c2fe8ebc2112b0b76ad61a5ce39b016d1314f72ebf30f16c85fb1925d
+updated: 2017-05-04T10:27:51.410208727Z
 imports:
 - name: collectd.org
   version: e84e8af5356e7f47485bbc95c96da6dd7984a67e
@@ -14,7 +14,7 @@ imports:
 - name: github.com/boltdb/bolt
   version: 4b1ebc1869ad66568b313d0dc410e2be72670dda
 - name: github.com/BurntSushi/toml
-  version: b26d9c308763d68093482582cea63d69be07a0f0
+  version: 99064174e013895bbd9b025c31100bd1d9b590ca
 - name: github.com/cespare/xxhash
   version: 4a94f899c20bc44d4f5f807cb14529e72aca99d6
 - name: github.com/dgrijalva/jwt-go
@@ -24,7 +24,7 @@ imports:
 - name: github.com/dgryski/go-bitstream
   version: 7d46cd22db7004f0cceb6f7975824b560cf0e486
 - name: github.com/gogo/protobuf
-  version: 100ba4e885062801d56799d78530b73b178a78f3
+  version: a9cd0c35b97daf74d0ebf3514c5254814b2703b4
   subpackages:
   - proto
 - name: github.com/golang/snappy
@@ -41,7 +41,6 @@ imports:
   version: 74aa2aa9ae830cd11b8e975e85bb60e61d8d1f21
   subpackages:
   - client/v2
-  - cluster
   - cmd
   - cmd/influxd/backup
   - cmd/influxd/help
@@ -90,33 +89,21 @@ imports:
   version: e383bbf6b2ec1a2fb8492dfd152d945fb88919b6
   subpackages:
   - fs
+- name: github.com/uber-go/atomic
+  version: 74ca5ec650841aee9f289dce76e928313a37cbc6
 - name: github.com/uber-go/zap
-  version: 1550bc05539134bbf8612a35f34a79ab8bf34ee3
+  version: fbae0281ffd546fa6d1959fec6075ac5da7fb577
 - name: github.com/zhexuany/influxcloud
-  version: 41aa2f23841c6dbaea7bbf40150feec2fc70afe0
+  version: f343c56ff9988119c006ba780514408779244aef
   subpackages:
+  - cluster
   - cmd/influxd-meta/run
+  - hh
   - meta
   - meta/internal
   - rpc
   - rpc/internal
   - tlv
-- name: github.com/zhexuany/influxdb-cluster
-  version: 41aa2f23841c6dbaea7bbf40150feec2fc70afe0
-  subpackages:
-  - hh
-  - meta
-- name: go.uber.org/atomic
-  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
-- name: go.uber.org/zap
-  version: 1550bc05539134bbf8612a35f34a79ab8bf34ee3
-  subpackages:
-  - buffer
-  - internal/bufferpool
-  - internal/color
-  - internal/exit
-  - internal/multierror
-  - zapcore
 - name: golang.org/x/crypto
   version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
   subpackages:

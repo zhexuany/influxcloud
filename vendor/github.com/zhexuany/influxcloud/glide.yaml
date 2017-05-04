@@ -1,0 +1,49 @@
+package: github.com/zhexuany/influxcloud
+import:
+- package: github.com/BurntSushi/toml
+- package: github.com/gogo/protobuf
+  subpackages:
+  - proto
+- package: github.com/hashicorp/raft
+- package: github.com/hashicorp/raft-boltdb
+- package: github.com/influxdata/influxdb
+  subpackages:
+  - cmd
+  - cmd/influxd/backup
+  - cmd/influxd/help
+  - cmd/influxd/restore
+  - cmd/influxd/run
+  - coordinator
+  - influxql
+  - models
+  - monitor
+  - monitor/diagnostics
+  - services/admin
+  - services/collectd
+  - services/continuous_querier
+  - services/graphite
+  - services/httpd
+  - services/meta
+  - services/opentsdb
+  - services/precreator
+  - services/retention
+  - services/snapshotter
+  - services/subscriber
+  - services/udp
+  - tcp
+  - toml
+  - tsdb
+  - tsdb/engine
+  - uuid
+- package: github.com/influxdata/usage-client
+  subpackages:
+  - v1
+- package: go.uber.org/zap
+- package: golang.org/x/crypto
+  subpackages:
+  - bcrypt
+- package: gopkg.in/fatih/pool.v2
+testImport:
+- package: github.com/davecgh/go-spew
+  subpackages:
+  - spew
