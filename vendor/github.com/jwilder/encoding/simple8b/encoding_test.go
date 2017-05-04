@@ -147,6 +147,7 @@ func testEncode(t *testing.T, n int, val uint64) {
 	if got != n {
 		t.Fatalf("Count mismatch: got %v, exp %v", got, n)
 	}
+
 }
 
 func Test_Bytes(t *testing.T) {
