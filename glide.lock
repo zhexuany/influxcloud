@@ -1,5 +1,5 @@
-hash: 24ad4e2c2fe8ebc2112b0b76ad61a5ce39b016d1314f72ebf30f16c85fb1925d
-updated: 2017-05-04T10:27:51.410208727Z
+hash: 08d9538544586f5e68cffe41e31b091f5ac7cb432aafe6618cd95ddc6dc8e222
+updated: 2017-05-04T19:16:29.422650678+08:00
 imports:
 - name: collectd.org
   version: e84e8af5356e7f47485bbc95c96da6dd7984a67e
@@ -17,6 +17,8 @@ imports:
   version: 99064174e013895bbd9b025c31100bd1d9b590ca
 - name: github.com/cespare/xxhash
   version: 4a94f899c20bc44d4f5f807cb14529e72aca99d6
+- name: github.com/davecgh/go-spew
+  version: 346938d642f2ec3594ed81d874461961cd0faa76
 - name: github.com/dgrijalva/jwt-go
   version: 24c63f56522a87ec5339cc3567883f1039378fdb
 - name: github.com/dgryski/go-bits
@@ -82,28 +84,35 @@ imports:
   subpackages:
   - v1
 - name: github.com/jwilder/encoding
-  version: 4dada27c33277820fe35c7ee71ed34fbc9477d00
+  version: 27894731927e49b0a9023f00312be26733744815
   subpackages:
   - simple8b
+- name: github.com/paulbellamy/ratecounter
+  version: 5a11f585a31379765c190c033b6ad39956584447
+- name: github.com/peterh/liner
+  version: 88609521dc4b6c858fd4c98b628147da928ce4ac
 - name: github.com/rakyll/statik
   version: e383bbf6b2ec1a2fb8492dfd152d945fb88919b6
   subpackages:
   - fs
+- name: github.com/retailnext/hllpp
+  version: 38a7bb71b483e855d35010808143beaf05b67f9d
+
 - name: github.com/uber-go/atomic
   version: 74ca5ec650841aee9f289dce76e928313a37cbc6
 - name: github.com/uber-go/zap
   version: fbae0281ffd546fa6d1959fec6075ac5da7fb577
-- name: github.com/zhexuany/influxcloud
-  version: f343c56ff9988119c006ba780514408779244aef
+- name: go.uber.org/atomic
+  version: 4e336646b2ef9fc6e47be8e21594178f98e5ebcf
+- name: go.uber.org/zap
+  version: 1550bc05539134bbf8612a35f34a79ab8bf34ee3
   subpackages:
-  - cluster
-  - cmd/influxd-meta/run
-  - hh
-  - meta
-  - meta/internal
-  - rpc
-  - rpc/internal
-  - tlv
+  - buffer
+  - internal/bufferpool
+  - internal/color
+  - internal/exit
+  - internal/multierror
+  - zapcore
 - name: golang.org/x/crypto
   version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
   subpackages:
@@ -115,8 +124,4 @@ imports:
   - unix
 - name: gopkg.in/fatih/pool.v2
   version: cba550ebf9bce999a02e963296d4bc7a486cb715
-testImports:
-- name: github.com/davecgh/go-spew
-  version: 346938d642f2ec3594ed81d874461961cd0faa76
-  subpackages:
-  - spew
+testImports: []

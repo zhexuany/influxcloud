@@ -832,7 +832,7 @@ func (c *Client) PrecreateShardGroups(from, to time.Time) error {
 }
 
 // ShardOwner returns the owning shard group info for a specific shard.
-func (c *Client) ShardOwner(shardID uint64) (database, policy string, sgi *meta.ShardGroupInfo) {
+func (c *Client) ShardOwner(shardID uint64) (database, policy string, si *meta.ShardInfo) {
 	for _, dbi := range c.data().Data.Databases {
 		for _, rpi := range dbi.RetentionPolicies {
 			for _, g := range rpi.ShardGroups {
@@ -844,7 +844,7 @@ func (c *Client) ShardOwner(shardID uint64) (database, policy string, sgi *meta.
 					if sh.ID == shardID {
 						database = dbi.Name
 						policy = rpi.Name
-						sgi = &g
+						si = &sh
 						return
 					}
 				}

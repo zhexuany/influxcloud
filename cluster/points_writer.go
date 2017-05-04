@@ -3,18 +3,16 @@ package cluster
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
-	"strings"
+	"github.com/uber-go/zap"
+	"github.com/zhexuany/influxcloud"
 )
 
 var (
@@ -34,15 +32,14 @@ type PointsWriter struct {
 	mu           sync.RWMutex
 	closing      chan struct{}
 	WriteTimeout time.Duration
-	Logger       *log.Logger
+	Logger       zap.Logger
 
-	Node *influxdb.Node
+	Node *influxcloud.Node
 
 	MetaClient interface {
 		Database(name string) (di *meta.DatabaseInfo)
 		RetentionPolicy(database, policy string) (*meta.RetentionPolicyInfo, error)
 		CreateShardGroup(database, policy string, timestamp time.Time) (*meta.ShardGroupInfo, error)
-		ShardOwner(shardID uint64) (string, string, *meta.ShardGroupInfo)
 	}
 
 	TSDBStore interface {
@@ -82,19 +79,21 @@ func NewPointsWriter() *PointsWriter {
 	return &PointsWriter{
 		closing:      make(chan struct{}),
 		WriteTimeout: DefaultWriteTimeout,
-		Logger:       log.New(os.Stderr, "[write] ", log.LstdFlags),
+		Logger:       zap.New(zap.NullEncoder()),
 	}
 }
 
 // ShardMapping contains a mapping of a shards to a points.
 type ShardMapping struct {
+	n      int
 	Points map[uint64][]models.Point  // The points associated with a shard ID
 	Shards map[uint64]*meta.ShardInfo // The shards that have been mapped, keyed by shard ID
 }
 
 // NewShardMapping creates an empty ShardMapping
-func NewShardMapping() *ShardMapping {
+func NewShardMapping(n int) *ShardMapping {
 	return &ShardMapping{
+		n:      n,
 		Points: map[uint64][]models.Point{},
 		Shards: map[uint64]*meta.ShardInfo{},
 	}
@@ -102,12 +101,10 @@ func NewShardMapping() *ShardMapping {
 
 // MapPoint maps a point to shard
 func (s *ShardMapping) MapPoint(shardInfo *meta.ShardInfo, p models.Point) {
-	points, ok := s.Points[shardInfo.ID]
-	if !ok {
-		s.Points[shardInfo.ID] = []models.Point{p}
-	} else {
-		s.Points[shardInfo.ID] = append(points, p)
+	if cap(s.Points[shardInfo.ID]) < s.n {
+		s.Points[shardInfo.ID] = make([]models.Point, 0, s.n)
 	}
+	s.Points[shardInfo.ID] = append(s.Points[shardInfo.ID], p)
 	s.Shards[shardInfo.ID] = shardInfo
 }
 
@@ -129,10 +126,9 @@ func (w *PointsWriter) Close() error {
 	return nil
 }
 
-// SetLogOutput sets the writer to which all logs are written. It must not be
-// called after Open is called.
-func (w *PointsWriter) SetLogOutput(lw io.Writer) {
-	w.Logger = log.New(lw, "[write] ", log.LstdFlags)
+// WithLogger sets the Logger on w.
+func (w *PointsWriter) WithLogger(log zap.Logger) {
+	w.Logger = log.With(zap.String("service", "write"))
 }
 
 // WriteStatistics keeps statistics related to the PointsWriter.
@@ -158,73 +154,87 @@ func (w *PointsWriter) MapShards(wp *WritePointsRequest) (*ShardMapping, error) 
 	rp, err := w.MetaClient.RetentionPolicy(wp.Database, wp.RetentionPolicy)
 	if err != nil {
 		return nil, err
-	}
-	if rp == nil {
-		return nil, influxdb.ErrRetentionPolicyNotFound(wp.RetentionPolicy)
+	} else if rp == nil {
+		return nil, influxcloud.ErrRetentionPolicyNotFound(wp.RetentionPolicy)
 	}
 
 	// Holds all the shard groups and shards that are required for writes.
-	list := new(sgList)
-	for _, p := range wp.Points {
-		if !list.Covers(p.Time()) {
-			sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, p.Time())
-			if err != nil {
-				return nil, err
-			}
-			list = list.Add(*sg)
-		}
+	list := make(sgList, 0, 8)
+	min := time.Unix(0, models.MinNanoTime)
+	if rp.Duration > 0 {
+		min = time.Now().Add(-rp.Duration)
 	}
 
-	mapping := NewShardMapping()
+	for _, p := range wp.Points {
+		// Either the point is outside the scope of the RP, or we already have
+		// a suitable shard group for the point.
+		if p.Time().Before(min) || list.Covers(p.Time()) {
+			continue
+		}
+
+		// No shard groups overlap with the point's time, so we will create
+		// a new shard group for this point.
+		sg, err := w.MetaClient.CreateShardGroup(wp.Database, wp.RetentionPolicy, p.Time())
+		if err != nil {
+			return nil, err
+		}
+
+		if sg == nil {
+			return nil, errors.New("nil shard group")
+		}
+		list = list.Append(*sg)
+	}
+
+	mapping := NewShardMapping(len(wp.Points))
 	for _, p := range wp.Points {
 		sg := list.ShardGroupAt(p.Time())
-		if sg != nil {
-			si := sg.ShardFor(p.HashID())
-			mapping.MapPoint(&si, p)
+		if sg == nil {
+			// We didn't create a shard group because the point was outside the
+			// scope of the RP.
+			continue
 		}
+
+		sh := sg.ShardFor(p.HashID())
+		mapping.MapPoint(&sh, p)
 	}
 	return mapping, nil
 }
 
 // sgList is a wrapper around a meta.ShardGroupInfos where we can also check
 // if a given time is covered by any of the shard groups in the list.
-// In addition, it also implements sort interface in order to sort after
-// each Add operation. This can improve the efficency of searching a given
-// ShardGroupInfo.
 type sgList meta.ShardGroupInfos
 
-func (l sgList) Len() int      { return len(l) }
-func (l sgList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
-func (l sgList) Less(i, j int) bool {
-	if l[i].EndTime.Equal(l[j].EndTime) {
-		return true
-	}
-	return false
-}
-
 func (l sgList) Covers(t time.Time) bool {
-	return len(l) != 0 && l.ShardGroupAt(t) != nil
+	if len(l) == 0 {
+		return false
+	}
+	return l.ShardGroupAt(t) != nil
 }
 
+// ShardGroupAt attempts to find a shard group that could contain a point
+// at the given time.
+//
+// Shard groups are sorted first according to end time, and then according
+// to start time. Therefore, if there are multiple shard groups that match
+// this point's time they will be preferred in this order:
+//
+//  - a shard group with the earliest end time;
+//  - (assuming identical end times) the shard group with the earliest start time.
 func (l sgList) ShardGroupAt(t time.Time) *meta.ShardGroupInfo {
-	if len(l) == 0 {
-		return nil
-	}
-	// Attempt to find a shard group that could contain this point.
-	// Shard groups are already sorted first according to end time.
 	idx := sort.Search(len(l), func(i int) bool { return l[i].EndTime.After(t) })
+
 	// We couldn't find a shard group the point falls into.
 	if idx == len(l) || t.Before(l[idx].StartTime) {
 		return nil
 	}
-
 	return &l[idx]
 }
 
-func (l *sgList) Add(sgi meta.ShardGroupInfo) *sgList {
-	next := append(*l, sgi)
-	sort.Sort(next)
-	return &next
+// Append appends a shard group to the list, and returns a sorted list.
+func (l sgList) Append(sgi meta.ShardGroupInfo) sgList {
+	next := append(l, sgi)
+	sort.Sort(meta.ShardGroupInfos(next))
+	return next
 }
 
 // WritePointsInto is a copy of WritePoints that uses a tsdb structure instead of
@@ -239,7 +249,7 @@ func (w *PointsWriter) WritePoints(database, retentionPolicy string, consistency
 	if retentionPolicy == "" {
 		db := w.MetaClient.Database(database)
 		if db == nil {
-			return influxdb.ErrDatabaseNotFound(database)
+			return influxcloud.ErrDatabaseNotFound(database)
 		}
 		retentionPolicy = db.DefaultRetentionPolicy
 	}
@@ -295,13 +305,13 @@ func (w *PointsWriter) writeToShard(shard *meta.ShardInfo, database, retentionPo
 	for _, owner := range shard.Owners {
 		go func(shardID uint64, owner meta.ShardOwner, points []models.Point) {
 			if w.Node.ID != owner.NodeID {
-				w.Logger.Printf("Remote Write")
+				w.Logger.Info("Remote Write")
 				return
 			}
 			// not actually created this shard, tell it to create it and retry the write
 			err := w.TSDBStore.WriteToShard(shardID, points)
 			if err != nil {
-				w.Logger.Printf("failed to write point to shard locally: %v", err)
+				w.Logger.Info("failed to write point to shard locally:", zap.Error(err))
 			}
 			ch <- &AsyncWriteResult{owner, err}
 			return
@@ -347,7 +357,7 @@ func (w *PointsWriter) writeToShard(shard *meta.ShardInfo, database, retentionPo
 		case result := <-ch:
 			// If the write returned an error, continue to the next response
 			if result.Err != nil {
-				w.Logger.Printf("write failed for shard %d on node %d: %v", shard.ID, result.Owner.NodeID, result.Err)
+				// w.Logger.Error("write failed for shard %d on node %d: %v", shard.ID, result.Owner.NodeID, result.Err)
 
 				// Keep track of the first error we see to return back to the client
 				if writeError == nil {

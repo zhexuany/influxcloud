@@ -8,7 +8,19 @@ import (
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/toml"
+	"github.com/zhexuany/influxcloud/cluster"
 )
+
+func newTags() models.Tags {
+	var tags models.Tags
+	tag := models.Tag{Key: []byte("host"), Value: []byte("server01")}
+	tags = append(tags, tag)
+	return tags
+}
+
+func newFields() models.Fields {
+	return models.Fields(map[string]interface{}{"value": int64(100)})
+}
 
 // Ensure the shard writer can successfully write a single request.
 func TestShardWriter_WriteShard_Success(t *testing.T) {
@@ -29,7 +41,8 @@ func TestShardWriter_WriteShard_Success(t *testing.T) {
 	// Build a single point.
 	now := time.Now()
 	var points []models.Point
-	points = append(points, models.MustNewPoint("cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now))
+	points = append(points, models.MustNewPoint("cpu", newTags(), newFields(),
+		now))
 
 	// Write to shard and close.
 	if err := w.WriteShard(1, 2, points); err != nil {
@@ -47,15 +60,26 @@ func TestShardWriter_WriteShard_Success(t *testing.T) {
 	}
 
 	// Validate point.
+	validatePoint(responses, t, now)
+}
+
+func validatePoint(responses []*serviceResponse, t *testing.T, now time.Time) {
+	// Validate point.
 	if p := responses[0].points[0]; p.Name() != "cpu" {
 		t.Fatalf("unexpected name: %s", p.Name())
-	} else if p.Fields()["value"] != int64(100) {
-		t.Fatalf("unexpected 'value' field: %d", p.Fields()["value"])
-	} else if p.Tags()["host"] != "server01" {
-		t.Fatalf("unexpected 'host' tag: %s", p.Tags()["host"])
+	} else if f, err := p.Fields(); err == nil {
+		if f["value"] != int64(100) {
+			t.Fatalf("unexpected 'value' field: %d", f["value"])
+		}
+	} else if tags := p.Tags(); tags != nil {
+		key := string(tags.Get([]byte("host")))
+		if key != "server01" {
+			t.Fatalf("unexpected 'host' tag: %s", string(key))
+		}
 	} else if p.Time().UnixNano() != now.UnixNano() {
 		t.Fatalf("unexpected time: %s", p.Time())
 	}
+
 }
 
 // Ensure the shard writer can successful write a multiple requests.
@@ -77,7 +101,7 @@ func TestShardWriter_WriteShard_Multiple(t *testing.T) {
 	// Build a single point.
 	now := time.Now()
 	var points []models.Point
-	points = append(points, models.MustNewPoint("cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now))
+	points = append(points, models.MustNewPoint("cpu", newTags(), map[string]interface{}{"value": int64(100)}, now))
 
 	// Write to shard twice and close.
 	if err := w.WriteShard(1, 2, points); err != nil {
@@ -97,15 +121,7 @@ func TestShardWriter_WriteShard_Multiple(t *testing.T) {
 	}
 
 	// Validate point.
-	if p := responses[0].points[0]; p.Name() != "cpu" {
-		t.Fatalf("unexpected name: %s", p.Name())
-	} else if p.Fields()["value"] != int64(100) {
-		t.Fatalf("unexpected 'value' field: %d", p.Fields()["value"])
-	} else if p.Tags()["host"] != "server01" {
-		t.Fatalf("unexpected 'host' tag: %s", p.Tags()["host"])
-	} else if p.Time().UnixNano() != now.UnixNano() {
-		t.Fatalf("unexpected time: %s", p.Time())
-	}
+	validatePoint(responses, t, now)
 }
 
 // Ensure the shard writer returns an error when the server fails to accept the write.
@@ -128,7 +144,10 @@ func TestShardWriter_WriteShard_Error(t *testing.T) {
 	ownerID := uint64(2)
 	var points []models.Point
 	points = append(points, models.MustNewPoint(
-		"cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now,
+		"cpu",
+		newTags(),
+		newFields(),
+		now,
 	))
 
 	if err := w.WriteShard(shardID, ownerID, points); err == nil || err.Error() != "error code 1: write shard 1: failed to write" {
@@ -159,7 +178,10 @@ func TestShardWriter_Write_ErrDialTimeout(t *testing.T) {
 	var points []models.Point
 
 	points = append(points, models.MustNewPoint(
-		"cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now,
+		"cpu",
+		newTags(),
+		models.Fields(map[string]interface{}{"value": int64(100)}),
+		now,
 	))
 
 	if err, exp := w.WriteShard(shardID, ownerID, points), "i/o timeout"; err == nil || !strings.Contains(err.Error(), exp) {
@@ -182,7 +204,10 @@ func TestShardWriter_Write_ErrReadTimeout(t *testing.T) {
 	ownerID := uint64(2)
 	var points []models.Point
 	points = append(points, models.MustNewPoint(
-		"cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now,
+		"cpu",
+		newTags(),
+		map[string]interface{}{"value": int64(100)},
+		now,
 	))
 
 	if err := w.WriteShard(shardID, ownerID, points); err == nil || !strings.Contains(err.Error(), "i/o timeout") {
@@ -212,7 +237,10 @@ func TestShardWriter_Write_PoolMax(t *testing.T) {
 	ownerID := uint64(2)
 	var points []models.Point
 	points = append(points, models.MustNewPoint(
-		"cpu", models.Tags{"host": "server01"}, map[string]interface{}{"value": int64(100)}, now,
+		"cpu",
+		newTags(),
+		newFields(),
+		now,
 	))
 
 	go w.WriteShard(shardID, ownerID, points)

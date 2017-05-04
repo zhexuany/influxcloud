@@ -2,18 +2,16 @@ package cluster_test
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
+	"github.com/zhexuany/influxcloud"
+	"github.com/zhexuany/influxcloud/cluster"
 )
-
-// TODO(benbjohnson): Rewrite tests to use cluster_test.MetaClient.
 
 // Ensures the points writer maps a single point to a single shard.
 func TestPointsWriter_MapShards_One(t *testing.T) {
@@ -78,6 +76,10 @@ func TestPointsWriter_MapShards_Multiple(t *testing.T) {
 		panic("should not get here")
 	}
 
+	// c := coordinator.NewPointsWriter()
+	// c.MetaClient = ms
+	// defer c.Close()
+
 	c := cluster.PointsWriter{MetaClient: ms}
 	pr := &cluster.WritePointsRequest{
 		Database:        "mydb",
@@ -86,9 +88,9 @@ func TestPointsWriter_MapShards_Multiple(t *testing.T) {
 
 	// Three points that range over the shardGroup duration (1h) and should map to two
 	// distinct shards
-	pr.AddPoint("cpu", 1.0, time.Unix(0, 0), nil)
-	pr.AddPoint("cpu", 2.0, time.Unix(0, 0).Add(time.Hour), nil)
-	pr.AddPoint("cpu", 3.0, time.Unix(0, 0).Add(time.Hour+time.Second), nil)
+	pr.AddPoint("cpu", 1.0, time.Now(), nil)
+	pr.AddPoint("cpu", 2.0, time.Now().Add(time.Hour), nil)
+	pr.AddPoint("cpu", 3.0, time.Now().Add(time.Hour+time.Second), nil)
 
 	var (
 		shardMappings *cluster.ShardMapping
@@ -119,6 +121,7 @@ func TestPointsWriter_MapShards_Multiple(t *testing.T) {
 	}
 }
 
+// TestPointsWriter_WritePoints is correct if TestPointsWriter_MapShards_Multiple/One also right.
 func TestPointsWriter_WritePoints(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -162,7 +165,7 @@ func TestPointsWriter_WritePoints(t *testing.T) {
 
 		// copy to prevent data race
 		theTest := test
-		sm := cluster.NewShardMapping()
+		sm := cluster.NewShardMapping(16)
 		sm.MapPoint(
 			&meta.ShardInfo{ID: uint64(1), Owners: []meta.ShardOwner{
 				{NodeID: 1},
@@ -216,19 +219,19 @@ func TestPointsWriter_WritePoints(t *testing.T) {
 		}
 		ms.NodeIDFn = func() uint64 { return 1 }
 
-		subPoints := make(chan *cluster.WritePointsRequest, 1)
-		sub := Subscriber{}
-		sub.PointsFn = func() chan<- *cluster.WritePointsRequest {
-			return subPoints
-		}
+		// subPoints := make(chan *cluster.WritePointsRequest, 1)
+		// sub := Subscriber{}
+		// sub.PointsFn = func() chan<- *cluster.WritePointsRequest {
+		// 	return subPoints
+		// }
 
 		c := cluster.NewPointsWriter()
 		c.MetaClient = ms
 		c.ShardWriter = sw
 		c.TSDBStore = store
 		c.HintedHandoff = hh
-		c.Subscriber = sub
-		c.Node = &influxdb.Node{ID: 1}
+		// c.Subscriber = sub
+		c.Node = &influxcloud.Node{ID: 1}
 
 		c.Open()
 		defer c.Close()
@@ -244,16 +247,16 @@ func TestPointsWriter_WritePoints(t *testing.T) {
 		if err != nil && test.expErr != nil && err.Error() != test.expErr.Error() {
 			t.Errorf("PointsWriter.WritePoints(): '%s' error: got %v, exp %v", test.name, err, test.expErr)
 		}
-		if test.expErr == nil {
-			select {
-			case p := <-subPoints:
-				if !reflect.DeepEqual(p, pr) {
-					t.Errorf("PointsWriter.WritePoints(): '%s' error: unexpected WritePointsRequest got %v, exp %v", test.name, p, pr)
-				}
-			default:
-				t.Errorf("PointsWriter.WritePoints(): '%s' error: Subscriber.Points not called", test.name)
-			}
-		}
+		// if test.expErr == nil {
+		// 	select {
+		// 	case p := <-subPoints:
+		// 		if !reflect.DeepEqual(p, pr) {
+		// 			t.Errorf("PointsWriter.WritePoints(): '%s' error: unexpected WritePointsRequest got %v, exp %v", test.name, p, pr)
+		// 		}
+		// 	default:
+		// 		t.Errorf("PointsWriter.WritePoints(): '%s' error: Subscriber.Points not called", test.name)
+		// 	}
+		// }
 	}
 }
 
@@ -356,6 +359,7 @@ func NewRetentionPolicy(name string, duration time.Duration, nodeCount int) *met
 		Owners: owners,
 	})
 
+	start := time.Now()
 	rp := &meta.RetentionPolicyInfo{
 		Name:               "myrp",
 		ReplicaN:           nodeCount,
@@ -364,8 +368,8 @@ func NewRetentionPolicy(name string, duration time.Duration, nodeCount int) *met
 		ShardGroups: []meta.ShardGroupInfo{
 			meta.ShardGroupInfo{
 				ID:        nextShardID(),
-				StartTime: time.Unix(0, 0),
-				EndTime:   time.Unix(0, 0).Add(duration).Add(-1),
+				StartTime: start,
+				EndTime:   start.Add(duration).Add(-1),
 				Shards:    shards,
 			},
 		},

@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/zhexuany/influxcloud/rpc"
 	"github.com/zhexuany/influxcloud/tlv"
@@ -98,4 +99,11 @@ func (e *StatementExecutor) executeKillQueryStatement(stmt *influxql.KillQuerySt
 		}(data)
 	}
 	return nil
+}
+
+// IntoWriteRequest is a partial copy of cluster.WriteRequest
+type IntoWriteRequest struct {
+	Database        string
+	RetentionPolicy string
+	Points          []models.Point
 }

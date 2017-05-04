@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"expvar"
-	"io"
 	"net"
 	"strings"
 	"sync"
@@ -33,14 +32,16 @@ type Service struct {
 	Listener net.Listener
 
 	MetaClient interface {
-		ShardOwner(shardID uint64) (string, string, meta.ShardGroupInfos)
+		ShardOwner(shardID uint64) (string, string, meta.ShardInfo)
 	}
 
 	TSDBStore coordinator.TSDBStore
 
 	ShardIteratorCreator coordinator.ShardIteratorCreator
 
-	Logger  zap.Logger
+	Logger      zap.Logger
+	ShardWriter ShardWriter
+
 	statMap *expvar.Map
 }
 
@@ -202,8 +203,13 @@ func (s *Service) processWriteShardRequest(buf []byte) error {
 	}
 
 	points := req.Points()
+	// write points locally
 	err := s.TSDBStore.WriteToShard(req.ShardID(), points)
 
+	// _, _, si := s.MetaClient.ShardOwner(req.ShardID())
+	// for _, node := range si.Owners {
+	// 	s.ShardWriter.WriteShard(req.ShardID(), node.NodeID, points)
+	// }
 	// We may have received a write for a shard that we don't have locally because the
 	// sending node may have just created the shard (via the metastore) and the write
 	// arrived before the local store could create the shard.  In this case, we need
@@ -257,9 +263,6 @@ func (s *Service) writeShardResponse(conn net.Conn, err error) {
 	}
 }
 
-func readUntilEOF() {
-
-}
 func (s *Service) processCreateIteratorRequest(conn net.Conn) {
 	defer conn.Close()
 
@@ -381,20 +384,6 @@ func (s *Service) processCreateShardSnapshotRequest() {
 }
 func (s *Service) processDeleteShardSnapshotRequest() {
 
-}
-
-// ReadTLV drains reader
-func ReadTLV(r io.Reader) (byte, []byte, error) {
-	typ, err := tlv.ReadType(r)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	buf, err := tlv.ReadLV(r)
-	if err != nil {
-		return 0, nil, err
-	}
-	return typ, buf, err
 }
 
 func (s *Service) processExpandSourcesRequest() {

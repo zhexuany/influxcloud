@@ -23,8 +23,8 @@ func (m *metaClient) DataNode(nodeID uint64) (*meta.NodeInfo, error) {
 	}, nil
 }
 
-func (m *metaClient) ShardOwner(shardID uint64) (db, rp string, si *meta.ShardInfo) {
-	return "db", "rp", &meta.ShardInfo{}
+func (m *metaClient) ShardOwner(shardID uint64) (db, rp string, si meta.ShardInfo) {
+	return "db", "rp", meta.ShardInfo{}
 }
 
 type testService struct {

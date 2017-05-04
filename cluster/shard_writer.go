@@ -19,7 +19,7 @@ type ShardWriter struct {
 	maxConnections int
 
 	MetaClient interface {
-		ShardOwner(shardID uint64) (database, policy string, sgi *meta.ShardGroupInfo)
+		ShardOwner(shardID uint64) (database, policy string, owners meta.ShardInfo)
 		DataNode(id uint64) (ni *meta.NodeInfo, err error)
 	}
 }
@@ -67,13 +67,7 @@ func (w *ShardWriter) WriteShardBinary(shardID, ownerID uint64, buf []byte) erro
 	}(conn)
 
 	// Determine the location of this shard and whether it still exists
-	db, rp, sgi := w.MetaClient.ShardOwner(shardID)
-	if sgi == nil {
-		// If we can't get the shard group for this shard, then we need to drop this request
-		// as it is no longer valid.  This could happen if writes were queued via
-		// hinted handoff and we're processing the queue after a shard group was deleted.
-		return nil
-	}
+	db, rp, _ := w.MetaClient.ShardOwner(shardID)
 
 	// Build write request.
 	var request rpc.WriteShardRequest
@@ -102,7 +96,7 @@ func (w *ShardWriter) WriteShardBinary(shardID, ownerID uint64, buf []byte) erro
 
 	// Read the response.
 	conn.SetReadDeadline(time.Now().Add(w.timeout))
-	_, buf, err = ReadTLV(conn)
+	_, buf, err = tlv.ReadTLV(conn)
 	if err != nil {
 		conn.MarkUnusable()
 		return err

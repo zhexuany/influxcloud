@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/zhexuany/influxcloud/cluster"
 )
 
 func TestConfig_Parse(t *testing.T) {

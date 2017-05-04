@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uber-go/zap"
 	"github.com/zhexuany/influxcloud"
 )
 
@@ -37,7 +38,7 @@ type Service struct {
 	https    bool
 	cert     string
 	err      chan error
-	Logger   *log.Logger
+	Logger   zap.Logger
 	store    *store
 
 	Node *influxcloud.Node
@@ -53,8 +54,9 @@ func NewService(c *Config) *Service {
 		cert:     c.HTTPSCertificate,
 		err:      make(chan error),
 	}
+
 	if c.LoggingEnabled {
-		s.Logger = log.New(os.Stderr, "[meta] ", log.LstdFlags)
+		s.Logger = zap.New(zap.NullEncoder())
 	} else {
 		s.Logger = log.New(ioutil.Discard, "", 0)
 	}

@@ -148,7 +148,7 @@ func (m *MetaExecutor) executeOnNode(stmt influxql.Statement, database string, n
 	conn.SetReadDeadline(time.Now().Add(m.timeout))
 	// TODO need migrte readTLV from cluster to tlv
 	// it is just temporary solution
-	_, buf, err = ReadTLV(conn)
+	_, buf, err = tlv.ReadTLV(conn)
 	if err != nil {
 		conn.MarkUnusable()
 		return err
