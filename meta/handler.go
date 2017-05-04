@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -19,6 +17,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/raft"
 	"github.com/influxdata/influxdb/uuid"
+	"github.com/uber-go/zap"
 	"github.com/zhexuany/influxcloud/meta/internal"
 )
 
@@ -26,7 +25,7 @@ import (
 type handler struct {
 	config *Config
 
-	logger         *log.Logger
+	logger         zap.Logger
 	loggingEnabled bool // Log every HTTP access.
 	pprofEnabled   bool
 	store          interface {
@@ -52,7 +51,7 @@ func newHandler(c *Config, s *Service) *handler {
 	h := &handler{
 		s:              s,
 		config:         c,
-		logger:         log.New(os.Stderr, "[meta-http] ", log.LstdFlags),
+		logger:         zap.New(zap.NullEncoder()),
 		loggingEnabled: c.ClusterTracing,
 		closing:        make(chan struct{}),
 		leases:         NewLeases(time.Duration(c.LeaseDuration)),
@@ -450,17 +449,17 @@ func requestID(inner http.Handler) http.Handler {
 	})
 }
 
-func logging(inner http.Handler, name string, weblog *log.Logger) http.Handler {
+func logging(inner http.Handler, name string, weblog zap.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
 		inner.ServeHTTP(l, r)
 		logLine := buildLogLine(l, r, start)
-		weblog.Println(logLine)
+		weblog.Info(logLine)
 	})
 }
 
-func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler {
+func recovery(inner http.Handler, name string, weblog zap.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		l := &responseLogger{w: w}
@@ -471,7 +470,7 @@ func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler 
 				runtime.Stack(b, false)
 				logLine := buildLogLine(l, r, start)
 				logLine = fmt.Sprintf("%s [panic:%s]\n%s", logLine, err, string(b))
-				weblog.Println(logLine)
+				weblog.Info(logLine)
 			}
 		}()
 
@@ -481,7 +480,7 @@ func recovery(inner http.Handler, name string, weblog *log.Logger) http.Handler 
 
 func (h *handler) httpError(err error, w http.ResponseWriter, status int) {
 	if h.loggingEnabled {
-		h.logger.Println(err)
+		h.logger.Info(err.Error())
 	}
 	http.Error(w, "", status)
 }

@@ -115,7 +115,7 @@ func (s *Service) Open() error {
 			continue
 		}
 
-		n := NewNodeProcessor(nodeID, s.pathforNode(nodeID), s.shardWriter, s.MetaClient, s.cfg)
+		n := NewNodeProcessor(nodeID, s.pathforNode(nodeID), s.shardWriter, s.MetaClient)
 		//Open newly created NodeProcessor
 		if err := n.Open(); err != nil {
 			return err
@@ -211,7 +211,7 @@ func (s *Service) WriteShard(shardID, ownerID uint64, points []models.Point) err
 
 			processor, ok = s.processors[ownerID]
 			if !ok {
-				processor = NewNodeProcessor(ownerID, s.pathforNode(ownerID), s.shardWriter, s.MetaClient, s.cfg)
+				processor = NewNodeProcessor(ownerID, s.pathforNode(ownerID), s.shardWriter, s.MetaClient)
 				if err := processor.Open(); err != nil {
 					return err
 				}

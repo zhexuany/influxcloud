@@ -11,7 +11,6 @@ import (
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/uber-go/zap"
-	"github.com/zhexuany/influxcloud/meta"
 	"sync/atomic"
 )
 
@@ -30,9 +29,14 @@ const (
 // NodeProcessor encapsulates a queue of hinted-handoff data for a node, and the
 // transmission of the data to the node.
 type NodeProcessor struct {
-	cfg    Config
-	nodeID uint64
-	dir    string
+	PurgeInterval    time.Duration // Interval between periodic purge checks
+	RetryInterval    time.Duration // Interval between periodic write-to-node attempts.
+	RetryMaxInterval time.Duration // Max interval between periodic write-to-node attempts.
+	MaxSize          int64         // Maximum size an underlying queue can get.
+	MaxAge           time.Duration // Maximum age queue data can get before purging.
+	RetryRateLimit   int64         // Limits the rate data is sent to node.
+	nodeID           uint64
+	dir              string
 
 	mu   sync.RWMutex
 	wg   sync.WaitGroup
@@ -49,9 +53,8 @@ type NodeProcessor struct {
 
 // NewNodeProcessor returns a new NodeProcessor for the given node, using dir for
 // the hinted-handoff data.
-func NewNodeProcessor(nodeID uint64, dir string, w shardWriter, m metaClient, cfg Config) *NodeProcessor {
+func NewNodeProcessor(nodeID uint64, dir string, w shardWriter, m metaClient) *NodeProcessor {
 	n := &NodeProcessor{
-		cfg:    cfg,
 		nodeID: nodeID,
 		dir:    dir,
 		writer: w,
@@ -89,7 +92,7 @@ func (n *NodeProcessor) Open() error {
 	}
 
 	// Create the queue of hinted-handoff data.
-	queue, err := newQueue(n.dir, n.cfg.MaxSize)
+	queue, err := newQueue(n.dir, n.MaxSize)
 	if err != nil {
 		return err
 	}
@@ -248,47 +251,40 @@ func (n *NodeProcessor) LastModified() (time.Time, error) {
 func (n *NodeProcessor) run() {
 	defer n.wg.Done()
 
-	currInterval := time.Duration(n.cfg.RetryInterval)
-	if currInterval > time.Duration(n.cfg.RetryMaxInterval) {
-		currInterval = time.Duration(n.cfg.RetryMaxInterval)
+	currInterval := time.Duration(n.RetryInterval)
+	if currInterval > time.Duration(n.RetryMaxInterval) {
+		currInterval = time.Duration(n.RetryMaxInterval)
 	}
 
 	for {
-		purgeTicker := time.NewTicker(time.Duration(n.cfg.PurgeInterval))
-		defer purgeTicker.Stop()
-		retryTicker := time.NewTicker(currInterval)
-		defer retryTicker.Stop()
-
-		limiter := NewRateLimiter(n.cfg.RetryRateLimit)
-
 		select {
 		case <-n.done:
 			return
-		case <-purgeTicker.C:
-			if err := n.queue.PurgeOlderThan(time.Now().Add(-time.Duration(n.cfg.MaxAge))); err != nil {
+
+		case <-time.After(n.PurgeInterval):
+			if err := n.queue.PurgeOlderThan(time.Now().Add(-n.MaxAge)); err != nil {
 				// n.Logger.Info("failed to purge for node %d: %s", n.nodeID, err.Error())
 			}
-		case <-retryTicker.C:
+
+		case <-time.After(currInterval):
+			limiter := NewRateLimiter(n.RetryRateLimit)
 			for {
 				c, err := n.SendWrite()
 				if err != nil {
 					if err == io.EOF {
-						// No more data, return to configured interval.
-						currInterval = time.Duration(n.cfg.RetryInterval)
-					} else if err == meta.ErrNodeNotFound {
-						// Node is crashed for some reason, just return.
-						return
+						// No more data, return to configured interval
+						currInterval = time.Duration(n.RetryInterval)
 					} else {
-						if currInterval > time.Duration(n.cfg.RetryMaxInterval) {
-							currInterval = time.Duration(n.cfg.RetryMaxInterval)
+						currInterval = currInterval * 2
+						if currInterval > time.Duration(n.RetryMaxInterval) {
+							currInterval = time.Duration(n.RetryMaxInterval)
 						}
-						// n.Logger.Info("error on sending write:%v", err)
 					}
 					break
 				}
 
 				// Success! Ensure backoff is cancelled.
-				currInterval = time.Duration(n.cfg.RetryInterval)
+				currInterval = time.Duration(n.RetryInterval)
 
 				// Update how many bytes we've sent
 				limiter.Update(c)
@@ -320,38 +316,36 @@ func (n *NodeProcessor) SendWrite() (int, error) {
 		return 0, err
 	}
 
-	ch := make(chan error)
+	// ch := make(chan error)
 
-	go func(buf []byte) {
-		// unmarshal the byte slice back to shard ID and points
-		shardID, points, err := unmarshalWrite(buf)
-		if err != nil {
-			atomic.AddInt64(&n.stats.WriteNodeReqFail, 1)
-			// n.Logger.Info("unmarshal write failed: %v", err)
+	// unmarshal the byte slice back to shard ID and points
+	shardID, points, err := unmarshalWrite(buf)
+	if err != nil {
+		atomic.AddInt64(&n.stats.WriteNodeReqFail, 1)
+		// n.Logger.Info("unmarshal write failed: %v", err)
 
-			// send err via channels
-			ch <- err
-			return
-		}
+		// send err via channels
+		// ch <- err
+		return 0, err
+	}
 
-		if err := n.writer.WriteShard(shardID, n.nodeID, points); err != nil {
-			ch <- err
-			return
-		}
-		atomic.AddInt64(&n.stats.WriteShardReq, 1)
-		atomic.AddInt64(&n.stats.WriteNodeReq, 1)
-		atomic.AddInt64(&n.stats.WriteNodeReqPoints, int64(len(points)))
-		ch <- nil
-	}(buf)
+	if err := n.writer.WriteShard(shardID, n.nodeID, points); err != nil {
+		// ch <- err
+		return 0, err
+	}
+	atomic.AddInt64(&n.stats.WriteShardReq, 1)
+	atomic.AddInt64(&n.stats.WriteNodeReq, 1)
+	atomic.AddInt64(&n.stats.WriteNodeReqPoints, int64(len(points)))
+	// ch <- nil
 
 	// Process err message from err channel.
-	r := <-ch
-	if r != nil {
-		if r == io.EOF || r == meta.ErrNodeNotFound {
-			return 0, r
-		}
-		// n.Logger.Info("SendWrite error: %v", r)
-	}
+	// r := <-ch
+	// if r != nil {
+	// 	if r == io.EOF || r == meta.ErrNodeNotFound {
+	// 		return 0, r
+	// 	}
+	// 	// n.Logger.Info("SendWrite error: %v", r)
+	// }
 
 	// Advance pos in segment if r is nil
 	if err := n.queue.Advance(); err != nil {
@@ -398,26 +392,19 @@ func (n *NodeProcessor) Empty() bool {
 
 func marshalWrite(shardID uint64, points []models.Point) []byte {
 	b := make([]byte, 8)
-	totalPB := make([]byte, 0)
 	binary.BigEndian.PutUint64(b, shardID)
 	for _, p := range points {
-		// If on fail, skip this point and continue
-		pB, err := p.MarshalBinary()
-		if err != nil {
-			continue
-		}
-
-		totalPB = append(totalPB, pB...)
-		totalPB = append(totalPB, '\n')
+		b = append(b, []byte(p.String())...)
+		b = append(b, '\n')
 	}
-	return append(b, totalPB...)
+	return b
 }
 
 func unmarshalWrite(b []byte) (uint64, []models.Point, error) {
 	if len(b) < 8 {
 		return 0, nil, fmt.Errorf("too short: len = %d", len(b))
 	}
-	shardID := binary.BigEndian.Uint64(b[:8])
+	ownerID := binary.BigEndian.Uint64(b[:8])
 	points, err := models.ParsePoints(b[8:])
-	return shardID, points, err
+	return ownerID, points, err
 }

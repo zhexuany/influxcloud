@@ -423,7 +423,7 @@ func (s *Server) Open() error {
 		svc.WithLogger(s.Logger)
 	}
 	s.SnapshotterService.WithLogger(s.Logger)
-	s.ClusterServerice.SetLogOutput(s.Logger)
+	s.ClusterServerice.WithLogger(s.Logger)
 	s.Monitor.WithLogger(s.Logger)
 
 	// Open TSDB store.

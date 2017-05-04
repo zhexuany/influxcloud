@@ -3,11 +3,8 @@ package meta // import "github.com/zhexuany/influxcloud/meta"
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -58,7 +55,7 @@ func NewService(c *Config) *Service {
 	if c.LoggingEnabled {
 		s.Logger = zap.New(zap.NullEncoder())
 	} else {
-		s.Logger = log.New(ioutil.Discard, "", 0)
+		s.Logger = zap.New(zap.NullEncoder())
 	}
 
 	return s
@@ -83,7 +80,7 @@ func (s *Service) Version() string {
 
 // Open starts the service
 func (s *Service) Open() error {
-	s.Logger.Println("Starting meta service at ", s.HTTPAddr())
+	// s.Logger.Info("Starting meta service at ", s.HTTPAddr())
 
 	if s.RaftListener == nil {
 		panic("no raft listener set")
@@ -103,7 +100,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on HTTPS:", listener.Addr().String())
+		//s.Logger.Info("Listening on HTTPS:", listener.Addr().String())
 		s.ln = listener
 	} else {
 		listener, err := net.Listen("tcp", s.httpAddr)
@@ -111,7 +108,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on HTTP:", listener.Addr().String())
+		//s.Logger.Info("Listening on HTTP:", listener.Addr().String())
 		s.ln = listener
 	}
 
@@ -227,9 +224,9 @@ func (s *Service) RaftAddr() string {
 // Err returns a channel for fatal errors that occur on the listener.
 func (s *Service) Err() <-chan error { return s.err }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) {
-	s.Logger = l
+// WithLogger sets the internal logger to the logger passed in
+func (s *Service) WithLogger(log zap.Logger) {
+	s.Logger = log.With(zap.String("service", "cluster"))
 }
 
 func autoAssignPort(addr string) bool {

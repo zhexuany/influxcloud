@@ -77,12 +77,12 @@ func TestNodeProcessorSendBlock(t *testing.T) {
 		},
 	}
 
-	cfg := Config{}
-	n := NewNodeProcessor(expNodeID, dir, sh, metastore, cfg)
+	n := NewNodeProcessor(expNodeID, dir, sh, metastore)
 	if n == nil {
 		t.Fatalf("Failed to create node processor: %v", err)
 	}
 
+	n.MaxSize = 1024
 	if err := n.Open(); err != nil {
 		t.Fatalf("Failed to open node processor: %v", err)
 	}

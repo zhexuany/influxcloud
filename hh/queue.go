@@ -100,6 +100,7 @@ func newQueue(dir string, maxSize int64) (*queue, error) {
 		maxSegmentSize: defaultSegmentSize,
 		maxSize:        maxSize,
 		segments:       segments{},
+		Logger:         zap.New(zap.NullEncoder()),
 	}
 	return q, nil
 }

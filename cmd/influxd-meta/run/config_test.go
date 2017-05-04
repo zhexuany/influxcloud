@@ -1,7 +1,6 @@
 package run_test
 
 import (
-	"os"
 	"testing"
 
 	"github.com/BurntSushi/toml"
