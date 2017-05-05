@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/influxdata/influxdb/cmd/influxd/backup"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/snapshotter"
+	"github.com/zhexuany/influxcloud/cmd/influxd/backup"
 )
 
 // Command represents the program execution for "influxd restore".

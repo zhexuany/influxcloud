@@ -11,7 +11,6 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
@@ -32,6 +31,7 @@ import (
 	"github.com/influxdata/influxdb/tsdb"
 	client "github.com/influxdata/usage-client/v1"
 	"github.com/uber-go/zap"
+	"github.com/zhexuany/influxcloud"
 	// Initialize the engine packages
 	_ "github.com/influxdata/influxdb/tsdb/engine"
 	"github.com/zhexuany/influxcloud/cluster"
@@ -120,15 +120,11 @@ func NewServer(c *Config, buildInfo *BuildInfo) (*Server, error) {
 		}
 	}
 
-	_, err := influxdb.LoadNode(c.Meta.Dir)
+	_, err := influxcloud.LoadNode(c.Meta.Dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-	}
-
-	if err := raftDBExists(c.Meta.Dir); err != nil {
-		return nil, err
 	}
 
 	// In 0.10.0 bind-address got moved to the top level. Check
