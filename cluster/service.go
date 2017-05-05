@@ -59,7 +59,7 @@ func (s *Service) Open() error {
 	s.wg.Add(1)
 	go s.serve()
 
-	s.Logger.Info(fmt.Sprint("Listening on HTTPS:", s.Listener.Addr().String()))
+	// s.Logger.Info(fmt.Sprint("Listening on HTTPS:", s.Listener.Addr().String()))
 	return nil
 }
 
