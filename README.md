@@ -1,6 +1,6 @@
 # influxCloud
 
-[Report Card](https://goreportcard.com/badge/github.com/zhexuany/influxcloud)](https://goreportcard.com/report/github.com/zhexuany/influxcloud)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zhexuany/influxcloud)](https://goreportcard.com/report/github.com/zhexuany/influxcloud)
 
 
 ## Status
