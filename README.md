@@ -1,5 +1,8 @@
 # influxCloud
 
+[Report Card](https://goreportcard.com/badge/github.com/zhexuany/influxcloud)](https://goreportcard.com/report/github.com/zhexuany/influxcloud)
+
+
 ## Status
 `influx-meta` is ready to go. But this need corporate with `influxd`. Comparing with current `influxd`, we have to append a `cluster` service. In this way,
 It enables the communication channel between `data` node and `meta` node.
