@@ -2,18 +2,18 @@ package cluster
 
 import (
 	"expvar"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
-	"fmt"
 
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"github.com/uber-go/zap"
 	"github.com/zhexuany/influxcloud/rpc"
 	"github.com/zhexuany/influxcloud/tlv"
-	"github.com/uber-go/zap"
 )
 
 // MaxMessageSize defines how large a message can be before we reject it
@@ -59,6 +59,7 @@ func (s *Service) Open() error {
 	s.wg.Add(1)
 	go s.serve()
 
+	s.Logger.Info(fmt.Sprint("Listening on HTTPS:", s.Listener.Addr().String()))
 	return nil
 }
 
